@@ -6,11 +6,17 @@
 
 ## Запуск
 
+* **Играть в браузере / на телефоне (GitHub Pages):** готовая сборка лежит в `docs/`.
+  Settings → Pages → Source: *Deploy from a branch* → ветка с проектом, папка `/docs`.
+  Игра откроется по адресу `https://<user>.github.io/<repo>/`.
+  Для приватного репозитория Pages требует платный план GitHub — иначе репозиторий нужно сделать публичным.
+  Обновить сборку: `godot --headless --export-release "Web" docs/index.html`.
+
 * **Редактор:** открыть папку в Godot 4.3+ → F5.
 * **Веб-сборка:**
   ```bash
-  godot --headless --export-release "Web" build/web/index.html
-  cd build/web && python3 -m http.server 8000   # открыть http://localhost:8000
+  godot --headless --export-release "Web" docs/index.html
+  cd docs && python3 -m http.server 8000   # открыть http://localhost:8000
   ```
   Сборка однопоточная (`thread_support=false`), поэтому **не требует COOP/COEP-заголовков**
   и работает на любом статическом хостинге (itch.io, GitHub Pages).
