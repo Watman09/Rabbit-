@@ -102,4 +102,4 @@ func _draw() -> void:
 			ready = player.dash_charges > 0
 		draw_circle(b.pos, b.r, Color(0.02, 0.0, 0.04, 0.6 if not held else 0.85))
 		draw_arc(b.pos, b.r, 0, TAU, 40, Color(col.r, col.g, col.b, 0.7 if ready else 0.25), 2.5)
-		hud._sigil(b.pos, b.icon, b.r * 0.55, col if ready else Color(0.5, 0.4, 0.5, 0.6))
+		HUD.draw_sigil(self, b.pos, b.icon, b.r * 0.55, col if ready else Color(0.5, 0.4, 0.5, 0.6), Time.get_ticks_msec() * 0.001)

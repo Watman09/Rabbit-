@@ -39,6 +39,9 @@ func _process(delta: float) -> bool:
 		return false
 	if frame > 30 and not g.running and root.get_node("Sfx").is_ready():
 		main._start()
+		if scenario == "boss":
+			main.director.start(10)
+			return false
 		if scenario == "stress":
 			main._stress(120)
 		else:
@@ -52,10 +55,15 @@ func _process(delta: float) -> bool:
 	if frame % 60 == 0 and g.enemies:
 		print("proc=%.2fms t=%.1f fps=%d enemies=%d hp=%d kills=%d souls=%d state=%d draw=%d" % [Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, t, Engine.get_frames_per_second(), g.enemies.alive_count(), p.hp, g.stats.kills, p.souls_total, p.state,
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)])
-	for s in [90, 150, 200, 260, 330, 420, 520]:
+	if scenario == "boss" and g.running:
+		for e in g.enemies.all:
+			if e.is_boss and e.alive and frame % 240 == 0:
+				e.take_hit(DamageInfo.make(e.max_hp * 0.3, e.position, 0.0, 0.0))
+				print("boss hp ratio ", e.hp / e.max_hp, " phase ", e.phase_n, " mode ", e.mode)
+	for s in [90, 150, 200, 260, 330, 420, 520, 700, 900, 1100]:
 		if frame == s:
 			root.get_texture().get_image().save_png("%s/shot_%04d.png" % [out, frame])
-	if frame > 600:
+	if frame > (1150 if scenario == "boss" else 600):
 		quit()
 	return false
 

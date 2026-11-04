@@ -141,8 +141,8 @@ func _draw() -> void:
 	# --- boss bar ---
 	if _boss and is_instance_valid(_boss):
 		var bw := minf(vs.x * 0.6, 720.0)
-		var bp := Vector2((vs.x - bw) * 0.5, 84)
-		_text(Vector2(0, bp.y - 6), Boss.NAME.to_upper(), 18, Color(1, 0.6, 0.7), HORIZONTAL_ALIGNMENT_CENTER, vs.x)
+		var bp := Vector2((vs.x - bw) * 0.5, 92)
+		_text(Vector2(0, bp.y - 8), Boss.NAME.to_upper(), 17, Color(1, 0.6, 0.7), HORIZONTAL_ALIGNMENT_CENTER, vs.x)
 		_slant_bar(bp, Vector2(bw, 14), _boss_ratio, _boss_lag, Color(0.4, 0.0, 0.1), Color(1.0, 0.1, 0.35))
 		for k in [0.33, 0.66]:
 			draw_line(bp + Vector2(bw * k + 8, 0), bp + Vector2(bw * k, 14), Color(0, 0, 0, 0.8), 2.0)
@@ -229,7 +229,7 @@ func _draw_ability(c: Vector2, ab: Ability, key: String, r: float) -> void:
 	if ready and ab.soul_cost > 0.0:
 		icol = col.lerp(Color.WHITE, 0.3 + 0.3 * sin(_t * 7.0))
 		draw_circle(c, r + 10, Color(col.r, col.g, col.b, 0.12 + 0.06 * sin(_t * 7.0)))
-	_sigil(c, ab.icon, r * 0.6, icol)
+	draw_sigil(self, c, ab.icon, r * 0.6, icol, _t)
 	if cdr > 0.0:
 		var pts := PackedVector2Array([c])
 		var steps := 24
@@ -243,34 +243,34 @@ func _draw_ability(c: Vector2, ab: Ability, key: String, r: float) -> void:
 	_text(c + Vector2(-30, r + 18), key, 14, Color(1, 1, 1, 0.75), HORIZONTAL_ALIGNMENT_CENTER, 60, 4)
 
 ## Simple vector sigils for abilities.
-func _sigil(c: Vector2, kind: String, s: float, col: Color) -> void:
+static func draw_sigil(ci: CanvasItem, c: Vector2, kind: String, s: float, col: Color, t: float) -> void:
 	match kind:
 		"whirl":
 			for k in 3:
-				var a0 := TAU * k / 3.0 + _t * 2.0
-				draw_arc(c, s * 0.85, a0, a0 + 1.6, 12, col, 3.0)
-			draw_circle(c, s * 0.18, col)
+				var a0 := TAU * k / 3.0 + t * 2.0
+				ci.draw_arc(c, s * 0.85, a0, a0 + 1.6, 12, col, 3.0)
+			ci.draw_circle(c, s * 0.18, col)
 		"crescent":
-			draw_arc(c + Vector2(-s * 0.15, 0), s * 0.9, -1.3, 1.3, 16, col, 4.0)
-			draw_arc(c + Vector2(-s * 0.45, 0), s * 0.75, -1.0, 1.0, 16, Color(col.r, col.g, col.b, 0.5), 2.0)
+			ci.draw_arc(c + Vector2(-s * 0.15, 0), s * 0.9, -1.3, 1.3, 16, col, 4.0)
+			ci.draw_arc(c + Vector2(-s * 0.45, 0), s * 0.75, -1.0, 1.0, 16, Color(col.r, col.g, col.b, 0.5), 2.0)
 		"harvest":
 			var pts := PackedVector2Array()
 			for k in 9:
 				var a := -PI * 0.5 + TAU * k / 8.0
 				var rr := s if k % 2 == 0 else s * 0.35
 				pts.append(c + Vector2(cos(a), sin(a)) * rr)
-			draw_polyline(pts, col, 2.5)
-			draw_arc(c, s * 1.05, 0.3, PI - 0.3, 16, col, 2.0)
+			ci.draw_polyline(pts, col, 2.5)
+			ci.draw_arc(c, s * 1.05, 0.3, PI - 0.3, 16, col, 2.0)
 		"heavy":
-			draw_line(c + Vector2(0, -s), c + Vector2(0, s), col, 3.0)
-			draw_arc(c + Vector2(-s * 0.3, -s * 0.4), s * 0.7, -PI * 0.9, -PI * 0.2, 12, col, 3.0)
+			ci.draw_line(c + Vector2(0, -s), c + Vector2(0, s), col, 3.0)
+			ci.draw_arc(c + Vector2(-s * 0.3, -s * 0.4), s * 0.7, -PI * 0.9, -PI * 0.2, 12, col, 3.0)
 		"dash":
 			for k in 3:
 				var o := Vector2(-s * 0.5 + k * s * 0.45, 0)
-				draw_polyline(PackedVector2Array([c + o + Vector2(-s * 0.25, -s * 0.5), c + o + Vector2(s * 0.2, 0), c + o + Vector2(-s * 0.25, s * 0.5)]), col, 3.0)
+				ci.draw_polyline(PackedVector2Array([c + o + Vector2(-s * 0.25, -s * 0.5), c + o + Vector2(s * 0.2, 0), c + o + Vector2(-s * 0.25, s * 0.5)]), col, 3.0)
 		"attack":
-			draw_arc(c, s * 0.9, -2.4, 0.6, 16, col, 4.0)
-			draw_line(c + Vector2(-s * 0.5, s * 0.8), c + Vector2(s * 0.3, -s * 0.6), col, 2.5)
+			ci.draw_arc(c, s * 0.9, -2.4, 0.6, 16, col, 4.0)
+			ci.draw_line(c + Vector2(-s * 0.5, s * 0.8), c + Vector2(s * 0.3, -s * 0.6), col, 2.5)
 
 func _draw_title(vs: Vector2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, vs), Color(0, 0, 0, 0.45))

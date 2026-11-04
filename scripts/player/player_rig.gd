@@ -82,7 +82,8 @@ func _ready() -> void:
 	body_mat = ShaderMaterial.new()
 	body_mat.shader = HERO_SHADER
 	body_mat.set_shader_parameter("cloth_height", 1.05)
-	body_mat.set_shader_parameter("rim_strength", 0.75)
+	body_mat.set_shader_parameter("rim_strength", 1.5)
+	body_mat.set_shader_parameter("rim_color", Color(0.55, 0.4, 1.0))
 	body_mat.set_shader_parameter("glow_strength", 0.8)
 	body_mesh.material_override = body_mat
 	body_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -114,6 +115,21 @@ func _ready() -> void:
 	scythe_mesh.material_override = scythe_mat
 	scythe_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	align.add_child(scythe_mesh)
+
+	# soft violet pool of light under the Reaper for readability in crowds
+	var pool := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(3.2, 3.2)
+	pool.mesh = pm
+	var gm := ShaderMaterial.new()
+	gm.shader = preload("res://assets/shaders/ground_fx.gdshader")
+	gm.set_shader_parameter("mode", 5)
+	gm.set_shader_parameter("fade", 1.6)
+	gm.set_shader_parameter("color", Color(0.35, 0.2, 0.8))
+	pool.material_override = gm
+	pool.position.y = 0.03
+	pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pool)
 
 	blade_light = OmniLight3D.new()
 	blade_light.light_color = Color(0.85, 0.25, 1.0)

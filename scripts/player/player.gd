@@ -71,6 +71,7 @@ func _ready() -> void:
 	input = PlayerInput.new()
 	add_child(input)
 	rig = PlayerRig.new()
+	rig.scale = Vector3.ONE * 1.15
 	add_child(rig)
 	_shadow = FX.make_shadow(1.1)
 	add_child(_shadow)

@@ -120,7 +120,8 @@ func _start() -> void:
 		return
 	hud.mode = "play"
 	Game.running = true
-	director.start()
+	var w := _query.find("wave=")
+	director.start(maxi(1, int(_query.substr(w + 5).split("&")[0])) if w != -1 else 1)
 	Sfx.start_music()
 	var m := _query.find("stress=")
 	if m != -1:

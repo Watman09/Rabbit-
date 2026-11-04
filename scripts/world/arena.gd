@@ -136,15 +136,15 @@ func _pillar(pos: Vector3) -> void:
 	var c := CylinderMesh.new()
 	c.top_radius = 0.75
 	c.bottom_radius = 0.9
-	c.height = 4.2
+	c.height = 2.4
 	c.radial_segments = 10
 	m.mesh = c
 	m.material_override = _stone
-	m.position = pos + Vector3(0, 2.1, 0)
+	m.position = pos + Vector3(0, 1.2, 0)
 	add_child(m)
 	var base := _box(pos, Vector3(2.1, 0.45, 2.1), _stone)
 	base.rotation.y = PI * 0.25
-	var cap := _box(pos + Vector3(0, 4.0, 0), Vector3(1.9, 0.4, 1.9), _stone)
+	var cap := _box(pos + Vector3(0, 2.3, 0), Vector3(1.9, 0.35, 1.9), _stone)
 	cap.rotation.y = PI * 0.25
 	Game.obstacles.append(Vector3(pos.x, pos.z, 1.05))
 	# faint red rune ring at the base

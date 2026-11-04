@@ -22,8 +22,8 @@ var _boss_escort_t := 0.0
 func _ready() -> void:
 	Events.boss_defeated.connect(func(_b): boss_alive = false)
 
-func start() -> void:
-	wave = 0
+func start(first_wave := 1) -> void:
+	wave = first_wave - 1
 	break_t = 1.2
 	in_wave = false
 
