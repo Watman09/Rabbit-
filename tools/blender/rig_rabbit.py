@@ -373,9 +373,10 @@ for i, f in enumerate([1, 16, 31, 46, 61]):
 make_action("Idle", idle)
 
 # ---------------------------------------------------------------- Run (20 frames = 0.667 s, two steps)
+# keyed every frame for a crisp gait; foot contacts at frames 6 (L) and 16 (R)
 run = []
 N = 20
-for f in range(0, N + 1, 2):
+for f in range(0, N + 1, 1):
     ph = f / N * math.tau
     s = math.sin(ph)
     c = math.cos(ph)
@@ -426,6 +427,102 @@ slump = merge(leg("L", -75.0, 135.0, 35.0), leg("R", -65.0, 135.0, 35.0),
                "upper_arm.R": [(SIDE, -20.0), (FWD, -10.0)], "forearm.R": [(SIDE, -5.0)]})
 make_action("Death", [(1, {}, None), (6, flinch, None), (16, kneel, {"hips": Vector((0, 0.05, -0.33))}),
                       (36, slump, {"hips": Vector((0, 0.08, -0.40))})], cyclic=False)
+
+# ---------------------------------------------------------------- combat footwork
+# Rotation about FWD abducts the legs: +deg spreads the left leg outward,
+# -deg the right one.
+def leg2(side, thigh, abduct, shin, foot):
+    sg = 1.0 if side == "L" else -1.0
+    return {f"thigh.{side}": [(SIDE, thigh), (FWD, abduct * sg)],
+            f"shin.{side}": [(SIDE, shin)], f"foot.{side}": [(SIDE, foot), (FWD, -abduct * sg * 0.6)]}
+
+
+def stance(lead, k=1.0):
+    """Fighting stance with the `lead` foot forward. k scales how low it sits."""
+    back = "R" if lead == "L" else "L"
+    return merge(leg2(lead, -14.0 * k, 9.0, 26.0 * k, -12.0 * k), leg2(back, 16.0 * k, 9.0, 24.0 * k, 4.0),
+                 {"hips": [(SIDE, 5.0 * k)], "spine": [(SIDE, 4.0 * k)], "chest": [(SIDE, 2.0)], "head": [(SIDE, -6.0 * k)],
+                  "ear.L": [(SIDE, -8.0)], "ear.R": [(SIDE, -10.0)],
+                  "upper_arm.R": [(SIDE, -18.0), (FWD, -14.0)], "forearm.R": [(SIDE, -40.0)]})
+
+
+STANCE_LOC = {"hips": Vector((0, 0, -0.06))}
+
+# Ready: combat idle (breathing in a low stance) - 1.6 s loop
+ready = []
+for i, f in enumerate([1, 13, 25, 37, 49]):
+    s = math.sin(i * math.pi / 2)
+    ready.append((f, merge(stance("L"), {"chest": [(SIDE, 2.0 * s)], "head": [(UP, 2.5 * s)],
+                                         "ear.L": [(SIDE, 4.0 * s)], "ear.R": [(SIDE, -3.0 * s)]}),
+                  {"hips": Vector((0, 0, -0.06 - 0.008 * s))}))
+make_action("Ready", ready)
+
+
+def strike(lead):
+    """Step-in strike. Key times are fixed so the game can map attack phases:
+    wind-up ends at frame 5 (0.133 s), the swing ends at frame 10 (0.30 s),
+    recovery ends at frame 23 (0.733 s)."""
+    back = "R" if lead == "L" else "L"
+    tw = 1.0 if lead == "L" else -1.0
+    wind = merge(leg2(lead, -6.0, 9.0, 20.0, -6.0), leg2(back, 10.0, 10.0, 42.0, 2.0),
+                 {"hips": [(SIDE, -2.0), (UP, 8.0 * tw)], "spine": [(SIDE, -6.0)], "chest": [(SIDE, -4.0)], "head": [(SIDE, 2.0)],
+                  "ear.L": [(SIDE, 6.0)], "ear.R": [(SIDE, 6.0)],
+                  "upper_arm.R": [(SIDE, 10.0), (FWD, -20.0)], "forearm.R": [(SIDE, -50.0)]})
+    lunge = merge(leg2(lead, -50.0, 8.0, 52.0, -8.0), leg2(back, 34.0, 8.0, 12.0, 24.0),
+                  {"hips": [(SIDE, 14.0), (UP, -10.0 * tw)], "spine": [(SIDE, 12.0)], "chest": [(SIDE, 8.0)], "head": [(SIDE, -14.0)],
+                   "ear.L": [(SIDE, -40.0)], "ear.R": [(SIDE, -44.0)],
+                   "upper_arm.R": [(SIDE, 30.0), (FWD, -40.0)], "forearm.R": [(SIDE, -20.0)]})
+    settle = merge(leg2(lead, -42.0, 9.0, 46.0, -10.0), leg2(back, 28.0, 9.0, 16.0, 18.0),
+                   {"hips": [(SIDE, 10.0), (UP, -6.0 * tw)], "spine": [(SIDE, 9.0)], "chest": [(SIDE, 5.0)], "head": [(SIDE, -10.0)],
+                    "ear.L": [(SIDE, -20.0)], "ear.R": [(SIDE, -24.0)],
+                    "upper_arm.R": [(SIDE, 12.0), (FWD, -25.0)], "forearm.R": [(SIDE, -30.0)]})
+    return [(1, stance(lead), STANCE_LOC),
+            (5, wind, {"hips": Vector((0, 0.03, -0.08))}),
+            (8, lunge, {"hips": Vector((0, -0.07, -0.13))}),
+            (10, lunge, {"hips": Vector((0, -0.08, -0.14))}),
+            (15, settle, {"hips": Vector((0, -0.05, -0.11))}),
+            (23, stance(lead), STANCE_LOC)]
+
+
+make_action("Strike_L", strike("L"), cyclic=False)
+make_action("Strike_R", strike("R"), cyclic=False)
+
+# Spin: low wide crouch for whirl / maelstrom (body rotation comes from the game)
+spin = []
+for i, f in enumerate([1, 4, 7, 10, 13]):
+    s = math.sin(i * math.pi / 2)
+    spin.append((f, merge(leg2("L", -22.0, 20.0, 55.0, -18.0), leg2("R", -10.0, 20.0, 50.0, -10.0),
+                          {"hips": [(SIDE, 12.0)], "spine": [(SIDE, 10.0)], "chest": [(SIDE, 6.0)], "head": [(SIDE, -10.0)],
+                           "ear.L": [(SIDE, -60.0 + 8.0 * s), (FWD, 20.0)], "ear.R": [(SIDE, -62.0 - 8.0 * s), (FWD, -20.0)],
+                           "upper_arm.R": [(FWD, -70.0 - 5.0 * s)], "forearm.R": [(SIDE, -10.0)]}),
+                 {"hips": Vector((0, 0, -0.16 - 0.01 * s))}))
+make_action("Spin", spin)
+
+# Charge: coiled crouch, weight on the back leg, trembling
+charge = []
+for i, f in enumerate([1, 3, 5, 7, 9]):
+    s = math.sin(i * math.pi / 2)
+    charge.append((f, merge(leg2("L", -30.0, 12.0, 58.0, -14.0), leg2("R", 22.0, 12.0, 62.0, 8.0),
+                            {"hips": [(SIDE, 4.0), (UP, 12.0)], "spine": [(SIDE, -2.0 + 1.0 * s), (UP, 8.0)], "chest": [(SIDE, -6.0), (UP, 8.0)],
+                             "head": [(SIDE, 4.0), (UP, -14.0)], "ear.L": [(SIDE, -55.0 + 4.0 * s)], "ear.R": [(SIDE, -58.0 - 4.0 * s)],
+                             "upper_arm.R": [(SIDE, 25.0), (FWD, -30.0)], "forearm.R": [(SIDE, -60.0)]}),
+                   {"hips": Vector((0, 0.04, -0.17 + 0.006 * s))}))
+make_action("Charge", charge)
+
+# Heavy: crouch -> spring up -> slam into a deep lunge -> recover
+# (frames: 1 stance, 4 crouch, 8 airborne, 11 slam (0.333 s), 14 hold, 30 recover)
+crouch = merge(leg2("L", -30.0, 12.0, 70.0, -16.0), leg2("R", 18.0, 12.0, 72.0, 10.0),
+               {"hips": [(SIDE, 8.0)], "spine": [(SIDE, 4.0)], "chest": [(SIDE, -6.0)], "head": [(SIDE, 2.0)],
+                "ear.L": [(SIDE, -40.0)], "ear.R": [(SIDE, -40.0)], "upper_arm.R": [(SIDE, 30.0)], "forearm.R": [(SIDE, -50.0)]})
+air = merge(leg2("L", -40.0, 6.0, 60.0, 10.0), leg2("R", 10.0, 6.0, 70.0, 20.0),
+            {"hips": [(SIDE, -6.0)], "spine": [(SIDE, -12.0)], "chest": [(SIDE, -14.0)], "head": [(SIDE, 6.0)],
+             "ear.L": [(SIDE, 20.0)], "ear.R": [(SIDE, 22.0)], "upper_arm.R": [(SIDE, -40.0), (FWD, -30.0)], "forearm.R": [(SIDE, -30.0)]})
+slam = merge(leg2("L", -62.0, 10.0, 82.0, -6.0), leg2("R", 44.0, 10.0, 26.0, 30.0),
+             {"hips": [(SIDE, 22.0)], "spine": [(SIDE, 20.0)], "chest": [(SIDE, 14.0)], "head": [(SIDE, -18.0)],
+              "ear.L": [(SIDE, 40.0)], "ear.R": [(SIDE, 44.0)], "upper_arm.R": [(SIDE, 40.0), (FWD, -50.0)], "forearm.R": [(SIDE, -10.0)]})
+make_action("Heavy", [(1, stance("L"), STANCE_LOC), (4, crouch, {"hips": Vector((0, 0.02, -0.2))}),
+                      (8, air, {"hips": Vector((0, -0.04, 0.06))}), (11, slam, {"hips": Vector((0, -0.12, -0.26))}),
+                      (14, slam, {"hips": Vector((0, -0.12, -0.25))}), (30, stance("L"), STANCE_LOC)], cyclic=False)
 
 # ---------------------------------------------------------------- export
 bpy.context.scene.render.fps = FPS

@@ -88,6 +88,10 @@ func _think(delta: float) -> void:
 			if t >= 0.8:
 				mode = "chase"; t = 0.0
 
+func threatens(p: Vector3) -> bool:
+	var d := position.distance_to(p)
+	return (mode == "slam_windup" and t > 0.55 and d < SLAM_R + 0.6) or (mode == "charging" and d < 3.0)
+
 func _faces_player() -> bool:
 	return mode == "chase" or mode == "slam_windup"
 

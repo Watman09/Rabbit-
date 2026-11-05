@@ -166,6 +166,10 @@ func _think(delta: float) -> void:
 			if t >= 0.0:
 				mode = "idle"; t = 0.0
 
+func threatens(p: Vector3) -> bool:
+	var d := position.distance_to(p)
+	return (mode == "sweep_windup" and t > 0.45 and d < 6.0) or (mode == "sweep" and d < 6.0) or (mode == "charging" and d < 4.0)
+
 func _recover(time: float) -> void:
 	mode = "recover"
 	t = -time / (1.0 + (phase_n - 1) * 0.25)

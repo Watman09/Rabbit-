@@ -12,10 +12,19 @@ var off_target := Vector3.ZERO      # world space: lower point on the shaft (off
 var off_weight := 0.0
 
 var _b := {}
+# ear springs (secondary motion): offset angles (pitch, roll) and velocities per ear
+var _ear_off := [Vector2.ZERO, Vector2.ZERO]
+var _ear_vel := [Vector2.ZERO, Vector2.ZERO]
+var _prev_head := Vector3.ZERO
+var _prev_head_vel := Vector3.ZERO
+var _has_prev := false
+const EAR_STIFF := 140.0
+const EAR_DAMP := 9.0
+const EAR_GAIN := 0.035
 
 func _ready() -> void:
 	var sk := get_skeleton()
-	for n in ["hips", "spine", "chest", "upper_arm.L", "forearm.L", "hand.L", "upper_arm.R", "forearm.R", "hand.R"]:
+	for n in ["hips", "spine", "chest", "head", "ear.L", "ear.R", "upper_arm.L", "forearm.L", "hand.L", "upper_arm.R", "forearm.R", "hand.R"]:
 		_b[n] = sk.find_bone(n)
 
 ## World position of the main-hand shoulder (used to keep the scythe in reach).
@@ -43,11 +52,39 @@ func _process_modification() -> void:
 		var q_chest := Quaternion(up, deg_to_rad(twist_deg * 0.6)) * Quaternion(side, lean * 0.6)
 		_rotate_global(sk, _b["spine"], q_spine)
 		_rotate_global(sk, _b["chest"], q_chest)
+	_ears(sk)
 	# --- arms
 	if grip_weight > 0.001:
 		_two_bone(sk, "L", inv * grip_target, grip_weight, Vector3(0.6, -0.5, -0.4))
 	if off_weight > 0.001:
 		_two_bone(sk, "R", inv * off_target, off_weight, Vector3(-0.6, -0.5, -0.4))
+
+## Ears lag behind head motion like soft springs, then settle.
+func _ears(sk: Skeleton3D) -> void:
+	var dt := clampf(get_process_delta_time(), 0.001, 0.05)
+	var head_w := sk.global_transform * sk.get_bone_global_pose(_b["head"]).origin
+	if not _has_prev:
+		_prev_head = head_w
+		_has_prev = true
+	var vel := (head_w - _prev_head) / dt
+	var acc := (vel - _prev_head_vel) / dt
+	_prev_head = head_w
+	_prev_head_vel = vel
+	# acceleration in skeleton space: forward accel tips the ears back, sideways sways them
+	var local_acc := sk.global_transform.basis.inverse() * acc
+	local_acc = local_acc.limit_length(80.0)
+	var drive := Vector2(-local_acc.z, local_acc.x) * EAR_GAIN
+	for i in 2:
+		var x: Vector2 = _ear_off[i]
+		var v: Vector2 = _ear_vel[i]
+		var a := -x * EAR_STIFF - v * EAR_DAMP + drive * EAR_STIFF * (1.0 + 0.15 * i)
+		v += a * dt
+		x += v * dt
+		x = x.limit_length(0.9)
+		_ear_off[i] = x
+		_ear_vel[i] = v
+		var q := Quaternion(Vector3.RIGHT, x.x) * Quaternion(Vector3.FORWARD, x.y)
+		_rotate_global(sk, _b["ear.L" if i == 0 else "ear.R"], q)
 
 ## Applies a rotation expressed in skeleton space to one bone (keeps children attached).
 func _rotate_global(sk: Skeleton3D, bone: int, q: Quaternion) -> void:

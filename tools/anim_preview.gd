@@ -26,11 +26,12 @@ func _init():
 	var l = DirectionalLight3D.new(); l.rotation_degrees = Vector3(-30, 30, 0); r.add_child(l)
 	var fl = MeshInstance3D.new(); var pm = PlaneMesh.new(); pm.size = Vector2(4,4); fl.mesh = pm; r.add_child(fl)
 	cam = Camera3D.new(); cam.projection = Camera3D.PROJECTION_ORTHOGONAL; cam.size = 2.2; r.add_child(cam)
-	for a in ["Idle", "Run", "Dash", "Hit", "Death"]:
+	var clips = OS.get_cmdline_user_args() if OS.get_cmdline_user_args().size() > 0 else ap.get_animation_list()
+	for a in clips:
 		var n = 4
 		for i in n:
 			for v in ["front", "side"]:
-				shots.append([a, ap.get_animation(a).length * i / n if a != "Death" else ap.get_animation(a).length * (i + 1) / n, v])
+				shots.append([a, ap.get_animation(a).length * i / (n - 1), v])
 func _dump(n, d):
 	if d < 4: print("  ".repeat(d), n.name, " ", n.get_class())
 	for c in n.get_children(): _dump(c, d + 1)

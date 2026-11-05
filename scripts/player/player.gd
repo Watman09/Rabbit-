@@ -28,6 +28,23 @@ var souls_total := 0
 var input: PlayerInput
 var rig: PlayerRig
 var abilities: Array[Ability] = []
+var execution: Execution
+
+## Run upgrades (see Upgrades): id -> level, and the modifiers they set.
+var upgrades := {}
+var mods := {
+	"damage": 1.0, "radius": 1.0, "cooldown": 1.0, "soul_gain": 1.0, "lifesteal": 0.0,
+	"dash_damage": 0.0, "echo_every": 0, "crescent_count": 1, "storm": 0, "burst_chance": 0.0,
+	"executioner": false,
+}
+# combat reactions
+var crit_t := 0.0                  # after a perfect dodge the next hits are critical
+var _perfect_this_dash := false
+var _dash_hit := {}
+var _swings := 0
+var _lifesteal_frame := 0.0
+const PERFECT_WINDOW := 0.2        # seconds from dash start
+const EXECUTE_RANGE := 5.0
 
 # attack state
 var combo: Array[AttackData]
@@ -68,6 +85,8 @@ var _pose_start: PlayerRig.ScythePose
 var _lunge_done := 0.0
 var _hit_anim_t := 0.0
 var _slash_fx: Dictionary = {}
+var _clip_restart := false
+var _last_yaw := 0.0
 ## Swing shaping: the blade is pulled back past the start angle (anticipation)
 ## and carries on past the end angle (follow-through) so it never stops dead.
 const ANTICIPATION := 24.0
@@ -86,6 +105,8 @@ func _ready() -> void:
 	add_child(_shadow)
 	combo = Moveset.light_combo()
 	abilities = [SoulMaelstrom.new(self), CrimsonCrescent.new(self), HarvestOfSouls.new(self)]
+	execution = Execution.new(self)
+	Events.enemy_killed.connect(_on_enemy_killed)
 	hp = max_hp
 	dash_charges = dash_charges_max
 	_emit_souls()
@@ -98,6 +119,8 @@ func _process(delta: float) -> void:
 	hurt_grace = maxf(0.0, hurt_grace - delta)
 	combo_timer = maxf(0.0, combo_timer - delta)
 	_dash_strike_window = maxf(0.0, _dash_strike_window - delta)
+	crit_t = maxf(0.0, crit_t - delta / maxf(Engine.time_scale, 0.05))
+	_lifesteal_frame = 0.0
 	_combat_idle = maxf(0.0, _combat_idle - delta)
 	_hitstop_frame = 0.0
 	combo_hits_timer -= delta
@@ -128,19 +151,36 @@ func _process(delta: float) -> void:
 
 func _update_clips(delta: float) -> void:
 	_hit_anim_t = maxf(0.0, _hit_anim_t - delta)
+	# roll into turns while running (sign: lean toward the inside of the turn)
+	var yaw := atan2(facing.x, facing.z)
+	var yaw_rate := wrapf(yaw - _last_yaw, -PI, PI) / maxf(delta, 0.0001)
+	_last_yaw = yaw
+	var speed01 := clampf(Vector2(velocity.x, velocity.z).length() / move_speed, 0.0, 1.0)
+	var bank_target := clampf(yaw_rate * 0.05, -0.28, 0.28) * speed01 if state == State.MOVE else 0.0
+	rig.bank = lerpf(rig.bank, bank_target, 1.0 - exp(-8.0 * delta))
+	if _hit_anim_t > 0.0 and state in [State.MOVE, State.ATTACK]:
+		rig.play("Hit", 0.05)
+		return
 	match state:
 		State.DASH:
 			rig.play("Dash", 0.05)
 		State.ATTACK:
-			if _hit_anim_t > 0.0:
-				rig.play("Hit", 0.05)
+			var a := attack
+			if a.clip == "Spin":
+				rig.play("Spin", 0.08, 1.6)
 			else:
-				rig.locomotion(0.0, true)
+				var ph := 0 if attack_t < a.windup else (1 if attack_t < a.windup + a.active else 2)
+				var dur := a.windup if ph == 0 else (a.active if ph == 1 else a.recovery)
+				rig.attack_clip(a.clip, ph, dur, _clip_restart)
+				_clip_restart = false
+		State.CHARGE:
+			rig.play("Charge", 0.12, 1.0)
+		State.CAST:
+			if cast_ability and cast_ability.animates_body:
+				return   # the ability drives the clip itself
+			rig.locomotion(Vector2(velocity.x, velocity.z).length(), true)
 		_:
-			if _hit_anim_t > 0.0:
-				rig.play("Hit", 0.05)
-			else:
-				rig.locomotion(Vector2(velocity.x, velocity.z).length(), false)
+			rig.locomotion(Vector2(velocity.x, velocity.z).length(), _combat_idle > 0.0)
 
 # ------------------------------------------------------------------ MOVE
 func _state_move(delta: float) -> void:
@@ -181,6 +221,13 @@ func _try_actions(allow_attack: bool) -> bool:
 		if input.consume("heavy"):
 			_start_charge()
 			return true
+		if input.peek("attack"):
+			var target := find_execution_target()
+			if target:
+				input.consume("attack")
+				execution.target = target
+				_start_cast(execution)
+				return true
 		if input.consume("attack"):
 			if _dash_strike_window > 0.0:
 				_start_attack(Moveset.dash_strike())
@@ -205,6 +252,7 @@ func _start_attack(a: AttackData, damage_mult := 1.0) -> void:
 	_prev_sweep = a.sweep_from
 	_hitstop_used = false
 	_lunge_done = 0.0
+	_clip_restart = true
 	attack_facing = input.aim if input.aim.length() > 0.1 else facing
 	facing = attack_facing
 	velocity = Vector3.ZERO
@@ -250,6 +298,10 @@ func _state_attack(delta: float) -> void:
 		if not _slash_spawned:
 			_slash_spawned = true
 			_spawn_slash(a)
+			_swings += 1
+			if mods.echo_every > 0 and _swings % mods.echo_every == 0 and a.damage > 0.0:
+				FX.crescent_wave(self, position + Vector3.UP * 0.95 + attack_facing * 0.8, attack_facing, 18.0 * mods.damage,
+					22.0, 0.55, 3.0 * mods.radius, Color(0.85, 0.1, 0.6), Color(1, 0.8, 0.95))
 			if a.sound != "":
 				Sfx.play(a.sound, randf_range(0.92, 1.08))
 		rig.apply_now()
@@ -311,7 +363,7 @@ func _spawn_slash(a: AttackData) -> void:
 	xf = xf * Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(a.plane_tilt)), Vector3(0, a.height, 0))
 	var follow := self if a.body_spin else null
 	# same arc and the same easing curve as the blade, so the trail stays on it
-	_slash_fx = FX.slash(xf, _antic(a), _follow(a), a.slash_inner, a.slash_outer, a.active, a.slash_life,
+	_slash_fx = FX.slash(xf, _antic(a), _follow(a), a.slash_inner, a.slash_outer * mods.radius, a.active, a.slash_life,
 		a.slash_trail, a.slash_edge, a.slash_core, a.slash_intensity, follow, true)
 
 func _rel_angle(dir_to: Vector3) -> float:
@@ -322,13 +374,14 @@ func _rel_angle(dir_to: Vector3) -> float:
 func _sweep_hits(a: AttackData, from_yaw: float, to_yaw: float) -> void:
 	var dirs := signf(a.sweep_to - a.sweep_from)
 	var swept := absf(to_yaw - a.sweep_from)
-	for e in Game.enemies.query_radius(position, a.radius + 1.5):
+	var reach: float = a.radius * mods.radius
+	for e in Game.enemies.query_radius(position, reach + 1.5):
 		if attack_hit.has(e.get_instance_id()):
 			continue
 		var d: Vector3 = e.position - position
 		d.y = 0
 		var dist := d.length()
-		if dist - e.radius > a.radius:
+		if dist - e.radius > reach:
 			continue
 		var margin := rad_to_deg(atan2(e.radius, maxf(dist, 0.1))) + 6.0
 		var rel := _rel_angle(d)
@@ -337,13 +390,14 @@ func _sweep_hits(a: AttackData, from_yaw: float, to_yaw: float) -> void:
 			_hit_enemy(e, a)
 
 func _cone_hits(a: AttackData) -> void:
-	for e in Game.enemies.query_radius(position, a.radius + 1.5):
+	var reach: float = a.radius * mods.radius
+	for e in Game.enemies.query_radius(position, reach + 1.5):
 		if attack_hit.has(e.get_instance_id()):
 			continue
 		var d: Vector3 = e.position - position
 		d.y = 0
 		var dist := d.length()
-		if dist - e.radius > a.radius:
+		if dist - e.radius > reach:
 			continue
 		var margin := rad_to_deg(atan2(e.radius, maxf(dist, 0.1)))
 		if dist < 1.0 or absf(_rel_angle(d)) <= a.cone_half + margin:
@@ -375,7 +429,15 @@ func _hit_enemy(e: Node, a: AttackData) -> void:
 func deal_damage(e: Node, info: DamageInfo, stop := 0.04, shake := 0.2) -> void:
 	if not e.alive:
 		return
+	info.amount *= mods.damage
+	if crit_t > 0.0 and info.source != "execution":
+		info.amount *= 2.0
+		info.stagger += 2.0
+		Events.popup.emit("КРИТ", e.position + Vector3.UP * 2.0, Color(0.6, 0.95, 1.0), 0.8)
 	var killed: bool = e.take_hit(info)
+	if mods.lifesteal > 0.0 and _lifesteal_frame < 3.0:
+		_lifesteal_frame += mods.lifesteal
+		heal(mods.lifesteal)
 	combo_hits += 1
 	combo_hits_timer = 2.2
 	Events.combo_changed.emit(combo_hits)
@@ -403,6 +465,10 @@ func _start_dash() -> void:
 	facing = dash_dir
 	invuln = maxf(invuln, dash_iframes)
 	_afterimage_t = 0.0
+	_perfect_this_dash = false
+	_dash_hit.clear()
+	if _threat_imminent():
+		_perfect_dodge(position)
 	Sfx.play("dash", randf_range(0.95, 1.1))
 	FX.burst("dust", position + Vector3.UP * 0.2, -dash_dir)
 	FX.dash_streak(position, position + dash_dir * dash_distance)
@@ -416,10 +482,14 @@ func _state_dash(delta: float) -> void:
 	velocity = dash_dir * speed
 	position += velocity * delta
 	var p := PlayerRig.POSE_RUN.copy()
-	p.lean = 0.45
-	p.squash = 0.92
-	p.bob = 0.05
+	p.lean = 0.3
 	rig.blend_to(p, delta, 30.0)
+	if mods.dash_damage > 0.0:
+		for e in Game.enemies.query_radius(position, 1.6):
+			if not _dash_hit.has(e.get_instance_id()) and e.position.distance_to(position) - e.radius < 1.1:
+				_dash_hit[e.get_instance_id()] = true
+				var info := DamageInfo.make(mods.dash_damage, position - dash_dir, 3.0, 0.8, "shadow_trail")
+				deal_damage(e, info, 0.0, 0.08)
 	_afterimage_t -= delta
 	if _afterimage_t <= 0.0:
 		_afterimage_t = 0.028
@@ -504,6 +574,8 @@ func is_invulnerable() -> bool:
 ## Returns true if the hit landed.
 func take_damage(amount: float, from: Vector3) -> bool:
 	if is_invulnerable():
+		if state == State.DASH and dash_t < PERFECT_WINDOW and not _perfect_this_dash:
+			_perfect_dodge(from)
 		return false
 	hp = maxf(0.0, hp - amount)
 	hurt_grace = 0.55
@@ -525,6 +597,62 @@ func take_damage(amount: float, from: Vector3) -> bool:
 		_die()
 	return true
 
+## Dodged an attack at the last moment: slow time, refund the dash, crit window.
+func _perfect_dodge(from: Vector3) -> void:
+	_perfect_this_dash = true
+	dash_charges = mini(dash_charges + 1, dash_charges_max)
+	crit_t = 1.6
+	invuln = maxf(invuln, 0.5)
+	Game.slowmo(0.55, 0.3)
+	FX.shockwave(position, 3.0, Color(0.4, 0.85, 1.0), 0.45)
+	FX.burst("perfect", position + Vector3.UP, Vector3.UP)
+	FX.screen_flash(Color(0.5, 0.85, 1.0, 0.18))
+	Sfx.play("perfect", 1.0)
+	Events.popup.emit("ИДЕАЛЬНО!", position + Vector3.UP * 2.4, Color(0.6, 0.95, 1.0), 1.2)
+	Game.stats.perfect = Game.stats.get("perfect", 0) + 1
+
+## Something is about to hit the Reaper right now (bolt, swing, AoE).
+func _threat_imminent() -> bool:
+	if Game.projectiles and Game.projectiles.threat_near(position, radius + 0.35, 0.22):
+		return true
+	if FX.telegraph_threat(position):
+		return true
+	if Game.enemies:
+		for e in Game.enemies.query_radius(position, 7.0):
+			if e.threatens(position):
+				return true
+	return false
+
+## Nearest stunned spirit within reach, preferring the aim direction.
+func find_execution_target() -> Enemy:
+	if Game.enemies == null:
+		return null
+	var best: Enemy = null
+	var best_score := INF
+	for e in Game.enemies.query_radius(position, EXECUTE_RANGE + 1.0):
+		if not e.stunned:
+			continue
+		var d: Vector3 = e.position - position
+		d.y = 0
+		var dist := d.length()
+		if dist > EXECUTE_RANGE + e.radius:
+			continue
+		var score := dist - input.aim.dot(d / maxf(dist, 0.01)) * 1.5
+		if score < best_score:
+			best_score = score
+			best = e
+	return best
+
+func _on_enemy_killed(e: Node) -> void:
+	if mods.burst_chance > 0.0 and randf() < mods.burst_chance and is_instance_valid(e):
+		var c: Vector3 = e.position
+		FX.shockwave(c, 2.8, Color(0.85, 0.1, 0.5), 0.3)
+		FX.burst("death_embers", c + Vector3.UP * 0.5, Vector3.UP)
+		Sfx.play("slam", randf_range(1.3, 1.5), -10.0)
+		for o in Game.enemies.query_radius(c, 3.0):
+			if o != e and o.position.distance_to(c) - o.radius < 2.5:
+				deal_damage(o, DamageInfo.make(14.0, c, 6.0, 1.0, "burst"), 0.0, 0.05)
+
 func heal(amount: float) -> void:
 	if state == State.DEAD:
 		return
@@ -534,7 +662,7 @@ func heal(amount: float) -> void:
 func add_soul(value: int) -> void:
 	souls_total += value
 	Game.stats.souls += value
-	soul_meter = minf(soul_meter_max, soul_meter + value * 1.6)
+	soul_meter = minf(soul_meter_max, soul_meter + value * 1.6 * mods.soul_gain)
 	heal(value * 0.35)
 	_emit_souls()
 

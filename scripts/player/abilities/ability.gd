@@ -11,6 +11,7 @@ var cd_left := 0.0
 var soul_cost := 0.0
 var invulnerable := false
 var dash_cancelable := true
+var animates_body := false     # true if the ability drives the rig's clips itself
 var t := 0.0
 
 func _init(p: Player) -> void:
@@ -23,11 +24,12 @@ func tick(delta: float) -> void:
 	cd_left = maxf(0.0, cd_left - delta)
 
 func cooldown_ratio() -> float:
-	return cd_left / cooldown if cooldown > 0.0 else 0.0
+	var full: float = cooldown * player.mods.cooldown
+	return cd_left / full if full > 0.0 else 0.0
 
 func begin() -> void:
 	t = 0.0
-	cd_left = cooldown
+	cd_left = cooldown * player.mods.cooldown
 	if soul_cost > 0.0:
 		player.spend_souls(soul_cost)
 	_begin()

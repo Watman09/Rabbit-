@@ -1,4 +1,5 @@
-## Pooled enemy bolts. Scythe swings can cut them out of the air.
+## Pooled enemy bolts. Scythe swings parry them: the bolt turns violet and
+## flies back into the nearest spirit.
 class_name EnemyProjectiles
 extends Node3D
 
@@ -11,6 +12,8 @@ var _life := PackedFloat32Array()
 var _dmg := PackedFloat32Array()
 var _size := PackedFloat32Array()
 var _active: Array[bool] = []
+var _reflected: Array[bool] = []
+var _last_parry_popup := 0
 var _free: Array[int] = []
 
 func _ready() -> void:
@@ -20,6 +23,7 @@ func _ready() -> void:
 	add_child(_mm)
 	for i in POOL:
 		_active.append(false)
+		_reflected.append(false)
 		_free.append(POOL - 1 - i)
 
 func fire(pos: Vector3, vel: Vector3, damage: float, color: Color, size := 0.45) -> void:
@@ -27,6 +31,7 @@ func fire(pos: Vector3, vel: Vector3, damage: float, color: Color, size := 0.45)
 		return
 	var i: int = _free.pop_back()
 	_active[i] = true
+	_reflected[i] = false
 	_pos[i] = pos
 	_vel[i] = vel
 	_life[i] = 4.0
@@ -58,11 +63,51 @@ func cut_sweep(origin: Vector3, facing: Vector3, from_deg: float, to_deg: float,
 		if d.length() > radius:
 			continue
 		if hi - lo >= 359.0:
-			_kill(i)
+			_reflect(i, origin)
 			continue
 		var rel := rad_to_deg(wrapf(atan2(d.x, d.z) - fa, -PI, PI))
 		if rel >= lo - 10.0 and rel <= hi + 10.0:
-			_kill(i)
+			_reflect(i, origin)
+
+## Parry: send an enemy bolt back toward the nearest spirit.
+func _reflect(i: int, origin: Vector3) -> void:
+	if _reflected[i]:
+		return
+	_reflected[i] = true
+	var target: Vector3 = _pos[i] + (_pos[i] - origin).normalized() * 6.0
+	var best := INF
+	if Game.enemies:
+		for e in Game.enemies.query_radius(_pos[i], 14.0):
+			var dd: float = e.position.distance_to(_pos[i])
+			if dd < best:
+				best = dd
+				target = e.position + Vector3.UP * 1.0
+	var dir := (target - _pos[i])
+	dir.y *= 0.3
+	_vel[i] = dir.normalized() * 18.0
+	_life[i] = 1.6
+	_dmg[i] = 24.0 * (Game.player.mods.damage if Game.player else 1.0)
+	_col[i] = Color(0.75, 0.45, 1.0, 2.0)
+	FX.burst("perfect", _pos[i], Vector3.UP)
+	Sfx.play("parry", randf_range(0.95, 1.1), -3.0)
+	Game.hitstop(0.03, 0.2)
+	var now := Time.get_ticks_msec()
+	if now - _last_parry_popup > 600:
+		_last_parry_popup = now
+		Events.popup.emit("ОТРАЖЕНО", _pos[i] + Vector3.UP * 0.8, Color(0.8, 0.6, 1.0), 0.9)
+	Game.stats.parries = Game.stats.get("parries", 0) + 1
+
+## True if an enemy bolt will pass within `r` of `p` in the next `horizon` seconds.
+func threat_near(p: Vector3, r: float, horizon: float) -> bool:
+	for i in POOL:
+		if not _active[i] or _reflected[i]:
+			continue
+		var rel := Vector2(_pos[i].x - p.x, _pos[i].z - p.z)
+		var v := Vector2(_vel[i].x, _vel[i].z)
+		var t := clampf(-rel.dot(v) / maxf(v.length_squared(), 0.001), 0.0, horizon)
+		if (rel + v * t).length() < r + _size[i]:
+			return true
+	return false
 
 func cut_circle(origin: Vector3, radius: float) -> void:
 	for i in POOL:
@@ -84,6 +129,15 @@ func _process(delta: float) -> void:
 		n += 1
 		if _life[i] <= 0.0 or Game.is_blocked(_pos[i], 0.1):
 			_kill(i)
+			continue
+		if _reflected[i]:
+			for e in Game.enemies.query_radius(_pos[i], 1.5):
+				var flat := Vector2(e.position.x - _pos[i].x, e.position.z - _pos[i].z)
+				if flat.length() - e.radius < 0.5 + _size[i]:
+					var info := DamageInfo.make(_dmg[i], _pos[i] - _vel[i], 7.0, 1.5, "parry")
+					p.deal_damage(e, info, 0.02, 0.15)
+					_kill(i)
+					break
 			continue
 		if p and p.state != Player.State.DEAD:
 			var dx := _pos[i].x - p.position.x

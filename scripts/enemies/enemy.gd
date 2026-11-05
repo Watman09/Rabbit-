@@ -46,6 +46,12 @@ var vis_scale := Vector3.ONE
 var dissolve := 1.0
 var _lag_z := 0.0
 var aura: MeshInstance3D
+# stun / execution (elites and colossi below 30% HP)
+var stunned := false
+var _stun_used := false
+var _stun_len := 3.0
+var _marker: MeshInstance3D
+const STUN_RATIO := 0.3
 
 func _ready() -> void:
 	phase = float(randi() % 16)
@@ -55,6 +61,34 @@ func _ready() -> void:
 		aura = FX.make_glow_sprite(Color(tint.r, tint.g * 0.5, tint.b, 0.35), 3.2 * visual_scale)
 		aura.position.y = 1.0 * visual_scale
 		add_child(aura)
+
+## True if this spirit is about to land a hit on `p` (used for perfect dodges).
+func threatens(p: Vector3) -> bool:
+	return false
+
+func can_be_stunned() -> bool:
+	return (elite or kind == "brute") and not is_boss
+
+func _stun() -> void:
+	_stun_used = true
+	stunned = true
+	_on_interrupt()
+	state = State.STAGGER
+	state_t = 0.0
+	_stun_len = 3.0
+	attack_amount = 0.0
+	if _marker == null:
+		_marker = FX.make_glow_sprite(Color(0.65, 0.35, 1.0, 1.6), 0.9)
+		add_child(_marker)
+	_marker.visible = true
+	FX.shockwave(position, 2.0 * visual_scale, Color(0.65, 0.3, 1.0), 0.4)
+	Sfx.play("charged", 0.7, -6.0)
+	Events.popup.emit("ОГЛУШЁН", position + Vector3.UP * (2.2 * visual_scale), Color(0.75, 0.55, 1.0), 1.0)
+
+## Called when the player starts an execution on this spirit.
+func hold_for_execution() -> void:
+	state_t = 0.0
+	_stun_len = 5.0
 
 func _mesh_kind() -> String:
 	return kind
@@ -98,7 +132,17 @@ func tick(delta: float, separation: Vector3) -> void:
 		State.STAGGER:
 			move_dir = Vector3.ZERO
 			attack_amount = move_toward(attack_amount, 0.0, delta * 4.0)
-			if state_t >= _stagger_time():
+			if stunned:
+				# slumped, pulsing: an open invitation to execute
+				flash = 0.18 + 0.12 * sin(state_t * 12.0)
+				if _marker:
+					_marker.position = Vector3(0, 2.1 * visual_scale + sin(state_t * 5.0) * 0.08, 0)
+					_marker.scale = Vector3.ONE * (0.8 + 0.25 * sin(state_t * 10.0))
+			if state_t >= _current_stagger_time():
+				if stunned:
+					stunned = false
+					if _marker:
+						_marker.visible = false
 				_enter_act()
 		State.ACT:
 			if Game.ai_frozen:
@@ -129,7 +173,7 @@ func _update_visual(delta: float) -> void:
 		yaw = lerp_angle(yaw, atan2(face_dir.x, face_dir.z), 1.0 - exp(-8.0 * delta))
 	rotation.y = yaw
 	if state != State.SPAWN:
-		vis_y = hover + sin(Time.get_ticks_msec() * 0.003 + phase) * 0.08 + lift
+		vis_y = hover + sin(Time.get_ticks_msec() * 0.003 + phase) * 0.08 + lift - (0.25 * visual_scale if stunned else 0.0)
 	var sq := 1.0 + punch * 0.25
 	vis_scale = Vector3(visual_scale * sq, visual_scale / sq, visual_scale * sq)
 	var v := _vel + knock
@@ -146,6 +190,9 @@ func _faces_player() -> bool:
 
 func _stagger_time() -> float:
 	return 0.35
+
+func _current_stagger_time() -> float:
+	return _stun_len if stunned else _stagger_time()
 
 func _enter_act() -> void:
 	state = State.ACT
@@ -182,6 +229,9 @@ func take_hit(info: DamageInfo) -> bool:
 	if hp <= 0.0:
 		die(info)
 		return true
+	if can_be_stunned() and not _stun_used and hp < max_hp * STUN_RATIO:
+		_stun()
+		return false
 	if info.stagger >= poise and state == State.ACT:
 		_on_interrupt()
 		state = State.STAGGER
@@ -190,6 +240,9 @@ func take_hit(info: DamageInfo) -> bool:
 
 func die(info: DamageInfo) -> void:
 	alive = false
+	stunned = false
+	if _marker:
+		_marker.visible = false
 	state = State.DYING
 	state_t = 0.0
 	_on_interrupt()

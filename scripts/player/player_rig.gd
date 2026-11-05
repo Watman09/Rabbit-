@@ -78,6 +78,18 @@ var _ghosts: Array[Node3D] = []
 var _ghost_t: Array[float] = []
 var _ghost_i := 0
 const STAFF_DIR := Vector3(0.216, 0.970, 0.111)   # shaft axis in scythe-mesh space
+## Phase key times (seconds) inside the attack clips authored in Blender:
+## [start, end of wind-up, end of swing, end of recovery]
+const CLIP_KEYS := {
+	"Strike_L": [0.0, 0.133, 0.30, 0.733],
+	"Strike_R": [0.0, 0.133, 0.30, 0.733],
+	"Heavy": [0.1, 0.233, 0.333, 0.967],
+}
+## Run clip foot contacts (seconds): left, right
+const RUN_CONTACTS := [0.167, 0.5]
+var bank := 0.0                 # roll into turns (rad), set by the player
+var _clip_phase := -1
+var _last_run_pos := 0.0
 
 var pose := ScythePose.new()
 var scythe_glow := 0.0
@@ -190,7 +202,7 @@ static func attack_pose(a: AttackData, sweep_yaw: float, lean: float) -> ScytheP
 
 static func _setup_clips(ap: AnimationPlayer) -> void:
 	# loop the locomotion clips; trim the duplicated last key of Blender cycles
-	for n in ["Idle", "Run", "Dash"]:
+	for n in ["Idle", "Run", "Dash", "Ready", "Spin", "Charge"]:
 		if ap.has_animation(n):
 			var a := ap.get_animation(n)
 			a.loop_mode = Animation.LOOP_LINEAR
@@ -205,18 +217,34 @@ func play(clip: String, blend := 0.15, speed := 1.0) -> void:
 	anim.play(clip, blend)
 
 ## Clip/speed selection from movement. speed in m/s.
-func locomotion(speed: float, busy: bool) -> void:
-	if busy:
-		play("Idle", 0.2, 1.0)
-	elif speed > 1.0:
+func locomotion(speed: float, combat: bool) -> void:
+	_clip_phase = -1
+	if speed > 1.0:
 		# ~2.2 m per two-step cycle of the Run clip
 		play("Run", 0.18, clampf(speed / 3.3, 0.7, 2.6))
+	elif combat:
+		play("Ready", 0.25, 1.0)
 	else:
-		play("Idle", 0.25, 1.0)
+		play("Idle", 0.3, 1.0)
+
+## Drives an attack clip so its authored phases line up with the attack's
+## timing: phase 0 = wind-up, 1 = swing, 2 = recovery; dur = that phase's length.
+func attack_clip(clip: String, phase: int, dur: float, restart := false) -> void:
+	var keys: Array = CLIP_KEYS.get(clip, [0.0, 0.133, 0.30, 0.733])
+	if restart or anim_state != clip:
+		anim_state = clip
+		anim.play(clip, 0.07)
+		anim.seek(keys[0], false)
+		_clip_phase = -1
+	if phase != _clip_phase:
+		_clip_phase = phase
+		var span: float = keys[phase + 1] - keys[phase]
+		anim.speed_scale = span / maxf(dur, 0.01)
 
 func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta * 6.0)
 	_apply()
+	_footsteps()
 	for i in _ghosts.size():
 		if _ghosts[i].visible:
 			_ghost_t[i] -= delta
@@ -237,7 +265,7 @@ func _apply() -> void:
 	scythe_mesh.position = STAFF_DIR.normalized() * pose.choke
 	# upper body twists toward the swing (limited), the rest turns the hips
 	var twist := clampf(pose.body_yaw * 0.6, -55.0, 55.0)
-	body.rotation = Vector3(pose.lean * 0.5, deg_to_rad(pose.body_yaw - twist), 0)
+	body.rotation = Vector3(pose.lean * 0.5, deg_to_rad(pose.body_yaw - twist), bank)
 	if ik:
 		ik.twist_deg = twist
 		ik.lean = pose.lean * 0.6
@@ -248,6 +276,21 @@ func _apply() -> void:
 	scythe_mat.set_shader_parameter("flash", flash * 0.5)
 	body_mat.set_shader_parameter("flash", flash)
 	blade_light.light_energy = 1.0 + scythe_glow * 2.5
+
+## Dust + a soft step sound when a foot lands in the Run clip.
+func _footsteps() -> void:
+	if anim_state != "Run" or not anim.is_playing():
+		return
+	var pos := anim.current_animation_position
+	for i in RUN_CONTACTS.size():
+		var c: float = RUN_CONTACTS[i]
+		var crossed := (_last_run_pos < c and pos >= c) or (pos < _last_run_pos and (c > _last_run_pos or c <= pos))
+		if crossed:
+			var foot := skeleton.find_bone("foot.L" if i == 0 else "foot.R")
+			var p := skeleton.global_transform * skeleton.get_bone_global_pose(foot).origin
+			FX.burst("step", Vector3(p.x, 0.08, p.z), Vector3.UP)
+			Sfx.play("step", randf_range(0.85, 1.15), -16.0)
+	_last_run_pos = pos
 
 ## Apply the current pose immediately (callers that read blade positions this frame).
 func apply_now() -> void:

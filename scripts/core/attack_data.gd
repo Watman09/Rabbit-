@@ -35,6 +35,7 @@ enum HitMode { SWEEP, CONE_AT_END }
 @export var spin := 0.0
 @export var body_twist := 0.35
 @export var body_spin := false            # body follows the sweep fully (spins)
+@export var clip := "Strike_L"            # footwork clip (Strike_L/Strike_R/Heavy/Spin)
 @export_group("Feel")
 @export var hitstop := 0.045
 @export var shake := 0.22

@@ -92,6 +92,8 @@ func _ready() -> void:
 		_enable_touch()
 
 	Events.player_died.connect(func(): _dead_t = 0.0)
+	Events.wave_cleared.connect(func(_n):
+		get_tree().create_timer(1.1, false).timeout.connect(_offer_upgrades))
 	Events.wave_started.connect(func(_n, boss): Sfx.play("boss_roar" if boss else "wave", 1.0, -3.0 if boss else -2.0))
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_autostart = "autostart" in _query
@@ -102,6 +104,29 @@ func _warmup() -> void:
 	Game.enemies.warmup(player.position)
 	FX.afterimage(player.rig, player.global_transform.translated(Vector3(0, -4, 0)))
 	Game.souls.drop(player.position + Vector3(0, -3, 0), 0)
+
+## After each wave: pause and let the player pick one of three upgrades.
+func _offer_upgrades() -> void:
+	if not Game.running or player.state == Player.State.DEAD or hud.mode != "play":
+		return
+	var ids := Upgrades.roll(player)
+	if ids.is_empty():
+		return
+	hud.open_upgrades(ids)
+	get_tree().paused = true
+	Sfx.play("upgrade", 1.0, -2.0)
+
+func _choose_upgrade(i: int) -> void:
+	if i < 0 or i >= hud.offer.size() or hud._offer_t < 0.35:
+		return
+	var id: String = hud.offer[i]
+	Upgrades.apply(player, id)
+	hud.mode = "play"
+	get_tree().paused = false
+	Sfx.play("charged", 1.2)
+	FX.shockwave(player.position, 3.5, Upgrades.RARE_COLOR if Upgrades.LIST[id].rare else Upgrades.COMMON_COLOR, 0.5)
+	Events.popup.emit(Upgrades.LIST[id].name, player.position + Vector3.UP * 2.5, Color(1, 0.85, 0.95), 1.0)
+	Events.upgrade_chosen.emit(id)
 
 func _enable_touch() -> void:
 	touch.visible = true
@@ -149,6 +174,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			if start_press and _dead_t > 1.2:
 				get_tree().paused = false
 				get_tree().reload_current_scene()
+		"upgrade":
+			if event is InputEventKey and event.pressed and not event.echo:
+				var k: int = event.physical_keycode
+				if k >= KEY_1 and k <= KEY_3:
+					_choose_upgrade(k - KEY_1)
+			elif (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed):
+				_choose_upgrade(hud.card_at(event.position))
 		"play", "paused":
 			if event.is_action_pressed("pause"):
 				var paused := not get_tree().paused

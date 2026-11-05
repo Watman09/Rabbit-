@@ -33,6 +33,8 @@ func _layout() -> void:
 func _input(event: InputEvent) -> void:
 	if not visible or player == null:
 		return
+	if hud and hud.mode != "play":
+		return   # menus (upgrade cards, pause) get the touches
 	if event is InputEventScreenTouch:
 		var st: InputEventScreenTouch = event
 		if st.pressed:

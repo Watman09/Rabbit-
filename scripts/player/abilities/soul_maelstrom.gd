@@ -2,22 +2,27 @@
 class_name SoulMaelstrom
 extends Ability
 
-const DURATION := 1.45
+const BASE_DURATION := 1.45
 const TICK := 0.13
-const RADIUS := 3.7
+const BASE_RADIUS := 3.7
 const DAMAGE := 8.0
 
 var _tick_t := 0.0
 var _spin := 0.0
 var _hits := 0
+var DURATION := BASE_DURATION
+var RADIUS := BASE_RADIUS
 
 func _init(p: Player) -> void:
 	super(p)
 	display_name = "Вихрь душ"
 	icon = "whirl"
 	cooldown = 7.0
+	animates_body = true
 
 func _begin() -> void:
+	DURATION = BASE_DURATION * (1.0 + 0.4 * player.mods.storm)
+	RADIUS = BASE_RADIUS * (1.0 + 0.2 * player.mods.storm) * player.mods.radius
 	_tick_t = 0.0
 	_spin = player.rig.pose.body_yaw
 	_hits = 0
@@ -33,6 +38,7 @@ func _update(delta: float) -> bool:
 	var pose := PlayerRig.ScythePose.make({"tilt": 6.0 * sin(t * 9.0), "height": 0.95, "yaw": _spin + 90.0,
 		"reach": 0.8, "sscale": 1.6, "choke": 0.62, "pitch": 92.0, "body_yaw": _spin, "lean": 0.15, "squash": 1.03})
 	p.rig.set_pose(pose)
+	p.rig.play("Spin", 0.08, 1.8)
 	p.rig.scythe_glow = 1.0
 	_tick_t -= delta
 	if _tick_t <= 0.0 and t < DURATION - 0.1:

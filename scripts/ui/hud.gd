@@ -12,7 +12,11 @@ const C_DIM := Color(1, 1, 1, 0.55)
 
 var font: Font
 var player: Player
-var mode := "title"   # title, play, paused, dead
+var mode := "title"   # title, play, paused, dead, upgrade
+var offer: Array[String] = []
+var card_rects: Array[Rect2] = []
+var _popups: Array = []      # [{text, pos, color, size, t}]
+var _offer_t := 0.0
 var _hp_shown := 1.0
 var _hp_lag := 1.0
 var _combo := 0
@@ -61,6 +65,10 @@ func _ready() -> void:
 		_boss = null
 		_banner_title = "ПУСТОТА ПОВЕРЖЕНА"; _banner_sub = "Но духи не утихают…"; _banner_t = 0.0)
 	Events.player_damaged.connect(func(_a, _h, _m): _hurt = 1.0)
+	Events.popup.connect(func(text, pos, col, sz):
+		if _popups.size() > 12:
+			_popups.pop_front()
+		_popups.append({"text": text, "pos": pos, "color": col, "size": sz, "t": 0.0}))
 
 func _process(delta: float) -> void:
 	var rd := delta / maxf(Engine.time_scale, 0.01)
@@ -69,6 +77,11 @@ func _process(delta: float) -> void:
 	_combo_t += rd
 	_combo_pulse = maxf(0.0, _combo_pulse - rd * 5.0)
 	_hurt = maxf(0.0, _hurt - rd * 1.8)
+	_offer_t += rd
+	for i in range(_popups.size() - 1, -1, -1):
+		_popups[i].t += rd
+		if _popups[i].t > 1.1:
+			_popups.remove_at(i)
 	_fps_acc += rd
 	_fps_frames += 1
 	if _fps_acc >= 0.5:
@@ -177,6 +190,36 @@ func _draw() -> void:
 		if rank != "":
 			_text(Vector2(cx - 400, vs.y * 0.42 + 46), rank, 20, Color(C_PINK.r, C_PINK.g, C_PINK.b, a), HORIZONTAL_ALIGNMENT_RIGHT, 400, 5)
 
+	# --- floating combat text ---
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		for pp in _popups:
+			var t: float = pp.t
+			var wp: Vector3 = pp.pos + Vector3.UP * t * 0.9
+			if cam.is_position_behind(wp):
+				continue
+			var sp := cam.unproject_position(wp)
+			var pop := 1.0 + 0.6 * maxf(0.0, 1.0 - t * 6.0)
+			var a := clampf((1.1 - t) * 3.0, 0.0, 1.0)
+			var col: Color = pp.color
+			col.a = a
+			var fs := int(26.0 * pp.size * pop)
+			_text(Vector2(sp.x - 200, sp.y), pp.text, fs, col, HORIZONTAL_ALIGNMENT_CENTER, 400, 6)
+	if player.crit_t > 0.0:
+		var k := player.crit_t / 1.6
+		_text(p0 + Vector2(0, 98), "КРИТИЧЕСКОЕ ОКНО", 13, Color(0.6, 0.95, 1.0, 0.6 + 0.4 * sin(_t * 14.0)), HORIZONTAL_ALIGNMENT_LEFT, -1, 4)
+		draw_rect(Rect2(p0 + Vector2(0, 104), Vector2(160 * k, 3)), Color(0.6, 0.95, 1.0, 0.9))
+	if player.upgrades.size() > 0:
+		var x := 28.0
+		for id in player.upgrades:
+			var u: Dictionary = Upgrades.LIST[id]
+			var c := p0 + Vector2(x - 18, 126)
+			draw_circle(c, 11, Color(0, 0, 0, 0.5))
+			draw_sigil(self, c, u.icon, 6.5, Upgrades.RARE_COLOR if u.rare else Upgrades.COMMON_COLOR, _t)
+			if player.upgrades[id] > 1:
+				_text(c + Vector2(4, 12), str(player.upgrades[id]), 10, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, -1, 3)
+			x += 26.0
+
 	# --- banner ---
 	if _banner_t < 3.2:
 		var a2 := clampf(_banner_t * 4.0, 0.0, 1.0) * clampf((3.2 - _banner_t) * 2.0, 0.0, 1.0)
@@ -203,6 +246,8 @@ func _draw() -> void:
 			draw_rect(Rect2(Vector2.ZERO, vs), Color(0, 0, 0, 0.55))
 			_text(Vector2(0, vs.y * 0.4), "ПАУЗА", 56, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, vs.x, 8)
 			_draw_controls(Vector2(vs.x * 0.5, vs.y * 0.4 + 40))
+		"upgrade":
+			_draw_upgrades(vs)
 		"dead":
 			draw_rect(Rect2(Vector2.ZERO, vs), Color(0.05, 0, 0.02, 0.6))
 			_text(Vector2(0, vs.y * 0.36), "ЖНЕЦ ПАЛ", 64, C_RED, HORIZONTAL_ALIGNMENT_CENTER, vs.x, 10)
@@ -210,8 +255,66 @@ func _draw() -> void:
 			var info := "Волна %d   •   Духов изгнано: %d   •   Душ: %d   •   Лучшее комбо: %d   •   Время: %d:%02d" % [
 				s.wave, s.kills, s.souls, s.max_combo, int(s.time) / 60, int(s.time) % 60]
 			_text(Vector2(0, vs.y * 0.36 + 44), info, 17, Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_CENTER, vs.x, 4)
+			var info2 := "Идеальных уклонений: %d   •   Казней: %d   •   Отражено: %d   •   Даров: %d" % [
+				s.get("perfect", 0), s.get("executions", 0), s.get("parries", 0), player.upgrades.size()]
+			_text(Vector2(0, vs.y * 0.36 + 70), info2, 15, Color(0.8, 0.7, 1.0, 0.85), HORIZONTAL_ALIGNMENT_CENTER, vs.x, 4)
 			if fmod(_t, 1.2) < 0.85:
 				_text(Vector2(0, vs.y * 0.36 + 100), "нажмите, чтобы восстать снова", 20, C_PINK, HORIZONTAL_ALIGNMENT_CENTER, vs.x, 5)
+
+func open_upgrades(ids: Array[String]) -> void:
+	offer = ids
+	mode = "upgrade"
+	_offer_t = 0.0
+
+## Index of the card under a screen point, or -1.
+func card_at(p: Vector2) -> int:
+	for i in card_rects.size():
+		if card_rects[i].has_point(p):
+			return i
+	return -1
+
+func _draw_upgrades(vs: Vector2) -> void:
+	var appear := clampf(_offer_t * 4.0, 0.0, 1.0)
+	draw_rect(Rect2(Vector2.ZERO, vs), Color(0.02, 0.0, 0.04, 0.72 * appear))
+	_text(Vector2(0, vs.y * 0.17), "ДАР ЖАТВЫ", 40, Color(1, 0.92, 0.96, appear), HORIZONTAL_ALIGNMENT_CENTER, vs.x, 8)
+	_text(Vector2(0, vs.y * 0.17 + 30), "выберите одно усиление", 16, Color(1, 0.5, 0.7, appear), HORIZONTAL_ALIGNMENT_CENTER, vs.x, 4)
+	var n := offer.size()
+	var cw := minf(260.0, (vs.x - 60.0) / maxf(n, 1) - 20.0)
+	var ch := minf(300.0, vs.y * 0.52)
+	var total := n * cw + (n - 1) * 24.0
+	var x0 := (vs.x - total) * 0.5
+	var y0 := vs.y * 0.3
+	var mouse := get_viewport().get_mouse_position()
+	card_rects.clear()
+	for i in n:
+		var id := offer[i]
+		var u: Dictionary = Upgrades.LIST[id]
+		var col: Color = Upgrades.RARE_COLOR if u.rare else Upgrades.COMMON_COLOR
+		var delay := clampf(_offer_t * 5.0 - i * 0.35, 0.0, 1.0)
+		var ease_in := 1.0 - pow(1.0 - delay, 3.0)
+		var r := Rect2(x0 + i * (cw + 24.0), y0 + (1.0 - ease_in) * 60.0, cw, ch)
+		card_rects.append(r)
+		var hover := r.has_point(mouse)
+		if hover:
+			r = r.grow(6)
+		var a := ease_in
+		draw_rect(r, Color(0.05, 0.03, 0.08, 0.95 * a))
+		draw_rect(Rect2(r.position, Vector2(r.size.x, 4)), Color(col.r, col.g, col.b, a))
+		draw_rect(r, Color(col.r, col.g, col.b, (0.9 if hover else 0.45) * a), false, 2.0 if hover else 1.5)
+		if hover:
+			draw_rect(r.grow(5), Color(col.r, col.g, col.b, 0.15 + 0.1 * sin(_t * 8.0)), false, 6.0)
+		var c := r.position + Vector2(r.size.x * 0.5, 74)
+		draw_circle(c, 40, Color(col.r, col.g, col.b, 0.12 * a))
+		draw_arc(c, 40, 0, TAU, 40, Color(col.r, col.g, col.b, 0.6 * a), 2.0)
+		draw_sigil(self, c, u.icon, 24.0, Color(col.r, col.g, col.b, a), _t)
+		_text(Vector2(r.position.x, r.position.y + 150), u.name, 20, Color(1, 0.95, 0.97, a), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 5)
+		draw_multiline_string(font, Vector2(r.position.x + 16, r.position.y + 182), u.desc, HORIZONTAL_ALIGNMENT_CENTER,
+			r.size.x - 32, 15, 4, Color(0.85, 0.85, 0.95, a))
+		var lv := Upgrades.level(player, id)
+		var lvl_text := ("ур. %d → %d" % [lv, lv + 1]) if lv > 0 else ("редкий" if u.rare else "новый")
+		_text(Vector2(r.position.x, r.end.y - 38), lvl_text, 13, Color(col.r, col.g, col.b, a), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 3)
+		if not get_meta("touch", false):
+			_text(Vector2(r.position.x, r.end.y - 14), "[%d]" % (i + 1), 14, Color(1, 1, 1, 0.5 * a), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 3)
 
 func _draw_ability(c: Vector2, ab: Ability, key: String, r: float) -> void:
 	var ready := ab.can_use()

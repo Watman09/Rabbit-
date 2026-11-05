@@ -16,7 +16,7 @@ var muted := false
 
 const SOUNDS := ["swing", "hit", "kill", "soul", "dash", "swing_big", "heavy", "hurt", "claw", "telegraph",
 	"bolt", "slam", "portal", "charge", "charged", "denied", "roar_small", "boss_roar", "ability_whirl",
-	"ability_crescent", "ability_harvest", "wave", "player_death", "drone"]
+	"ability_crescent", "ability_harvest", "wave", "player_death", "step", "perfect", "parry", "execute", "upgrade", "drone"]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -94,6 +94,11 @@ func _make(n: String) -> AudioStreamWAV:
 		"ability_harvest": s = _mix(_mix(_tone(0.9, 220.0, 660.0, 0.25, "sine", 6.0), _tone(0.9, 277.0, 830.0, 0.2, "sine", 6.0)), _noise_sweep(0.9, 300.0, 3000.0, 0.3))
 		"wave": s = _gong(1.8)
 		"player_death": s = _mix(_tone(1.2, 440.0, 80.0, 0.4, "saw", 5.0), _noise_sweep(1.2, 2000.0, 100.0, 0.3))
+		"step": s = _noise_sweep(0.09, 900.0, 200.0, 0.5, 0.002)
+		"perfect": s = _mix(_mix(_tone(0.7, 1568.0, 1568.0, 0.25, "sine"), _tone(0.7, 2093.0, 2093.0, 0.18, "sine")), _noise_sweep(0.5, 4000.0, 800.0, 0.35))
+		"parry": s = _mix(_tone(0.3, 2637.0, 1975.0, 0.3, "square"), _noise_burst(0.06, 0.6, 7000.0))
+		"execute": s = _distort(_mix(_boom(0.9, 55.0, 1.0), _whoosh(0.5, 3000.0, 300.0, 1.0)), 1.6)
+		"upgrade": s = _mix(_mix(_tone(0.6, 523.0, 523.0, 0.25, "sine"), _tone(0.6, 784.0, 784.0, 0.2, "sine")), _tone(0.6, 1046.0, 1046.0, 0.15, "sine"))
 		"drone":
 			s = _drone(8.0)
 			loop = true

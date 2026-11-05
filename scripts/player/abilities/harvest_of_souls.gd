@@ -20,6 +20,7 @@ func _init(p: Player) -> void:
 	soul_cost = 100.0
 	invulnerable = true
 	dash_cancelable = false
+	animates_body = true
 
 func _begin() -> void:
 	_slammed = false
@@ -30,6 +31,9 @@ func _begin() -> void:
 func _update(delta: float) -> bool:
 	var p := player
 	p.velocity = Vector3.ZERO
+	# Heavy clip phases: crouch+spring (to the air key), drop, slam recovery
+	var ph := 0 if t < RISE else (1 if t < SLAM else 2)
+	p.rig.attack_clip("Heavy", ph, [RISE, SLAM - RISE, END - SLAM][ph], t <= delta)
 	if t < RISE:
 		var k := t / RISE
 		var pose := PlayerRig.ScythePose.make({"tilt": 90.0, "height": 1.1, "yaw": -170.0, "reach": 0.8, "sscale": 1.6, "choke": 0.62,

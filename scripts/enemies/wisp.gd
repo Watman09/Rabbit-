@@ -56,6 +56,10 @@ func _think(delta: float) -> void:
 				mode = "chase"; t = 0.0
 				cd = randf_range(1.4, 2.6)
 
+func threatens(p: Vector3) -> bool:
+	var d := position.distance_to(p)
+	return (mode == "windup" and t > 0.25 and d < 4.5) or (mode == "lunge" and d < 2.5)
+
 func _on_interrupt() -> void:
 	super()
 	mode = "recover"; t = 0.0

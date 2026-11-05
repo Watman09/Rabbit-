@@ -11,6 +11,7 @@ func _init(p: Player) -> void:
 	display_name = "Багровый серп"
 	icon = "crescent"
 	cooldown = 3.2
+	animates_body = true
 	_data = Moveset.crescent_throw()
 
 func _begin() -> void:
@@ -29,11 +30,16 @@ func _update(delta: float) -> bool:
 	else:
 		player.rig.set_pose(pose)
 	player.rig.scythe_glow = 1.0
+	var ph := 0 if t < a.windup else (1 if t < a.windup + a.active else 2)
+	player.rig.attack_clip(a.clip, ph, [a.windup, a.active, a.recovery][ph], t <= delta)
 	if not _thrown and t >= a.windup + a.active * 0.5:
 		_thrown = true
 		Sfx.play("ability_crescent", 1.0)
-		FX.crescent_wave(player, player.position + Vector3.UP * 0.95 + _dir * 0.8, _dir, 26.0, 24.0, 0.72, 4.0,
-			Color(1.0, 0.04, 0.2), Color(1.0, 0.75, 0.85))
+		var n: int = player.mods.crescent_count
+		for i in n:
+			var d := _dir.rotated(Vector3.UP, (i - (n - 1) * 0.5) * 0.32)
+			FX.crescent_wave(player, player.position + Vector3.UP * 0.95 + d * 0.8, d, 26.0, 24.0, 0.72, 4.0 * player.mods.radius,
+				Color(1.0, 0.04, 0.2), Color(1.0, 0.75, 0.85))
 		player.position -= _dir * 0.25
 		if Game.camera:
 			Game.camera.add_trauma(0.25)

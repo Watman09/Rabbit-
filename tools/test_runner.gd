@@ -16,6 +16,7 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0: out = args[0]
 	if args.size() > 1: scenario = args[1]
+	if "run" in args: set_meta("run_film", true)
 	if "noparticles" in args: root.get_node("FX").particles_enabled = false
 	if "nospirits" in args: set_meta("nospirits", true)
 	DirAccess.make_dir_recursive_absolute(out)
@@ -31,6 +32,12 @@ func _process(delta: float) -> bool:
 	if frame == 30:
 		# wait for sfx synthesis then start
 		pass
+	if scenario == "film":
+		_film(g)
+		return false
+	if scenario == "reactions":
+		_reactions(g)
+		return false
 	if scenario == "spirits":
 		_spirits(g)
 		return false
@@ -141,4 +148,84 @@ func _spirits(g) -> void:
 	if frame == 80:
 		root.get_texture().get_image().save_png("%s/spirits_die.png" % out)
 	if frame == 90:
+		quit()
+
+var _elite = null
+func _reactions(g) -> void:
+	var p = g.player
+	var inp = p.input
+	if frame == 2:
+		g.ai_frozen = true
+		g.camera.distance = 11.0
+		p.position = Vector3(0, 0, 3)
+		inp.using_touch = true   # auto-aim at the nearest spirit
+	if frame == 30:
+		main._start()
+		main.director.set_process(false)
+	# 1) perfect dodge: bolt straight at the player, dash just before it lands
+	if frame == 40:
+		g.projectiles.fire(p.position + Vector3(0, 1.0, -3.0), Vector3(0, 0, 12.0), 10.0, Color.RED)
+	if frame == 47:
+		inp.touch_move = Vector3(1, 0, 0)
+		inp.press("dash")
+	if frame == 56:
+		root.get_texture().get_image().save_png("%s/r1_perfect.png" % out)
+	if frame == 60:
+		inp.touch_move = Vector3.ZERO
+		print("perfect=", g.stats.get("perfect", 0), " crit_t=", p.crit_t)
+	# 2) parry: bolt toward the player, swing into it
+	if frame == 110:
+		_elite = g.enemies.spawn("wraith", p.position + Vector3(2.5, 0, -4), 1.0, true, true)
+		g.projectiles.fire(p.position + Vector3(0, 1.0, -4.0), Vector3(0, 0, 5.0), 10.0, Color.RED)
+	if frame == 128:
+		inp.aim = Vector3(0, 0, -1)
+		inp.press("attack")
+	if frame == 136:
+		root.get_texture().get_image().save_png("%s/r2_parry.png" % out)
+	if frame == 170:
+		print("parries=", g.stats.get("parries", 0), " elite hp ", _elite.hp, "/", _elite.max_hp)
+	# 3) stun + execution
+	if frame == 180 and is_instance_valid(_elite):
+		_elite.take_hit(DamageInfo.make(_elite.hp - _elite.max_hp * 0.2, _elite.position + Vector3(0, 0, 1), 0.0, 0.0))
+		print("stunned=", _elite.stunned)
+	if frame == 195:
+		root.get_texture().get_image().save_png("%s/r3_stunned.png" % out)
+		inp.press("attack")
+	for f in [203, 212, 220, 232]:
+		if frame == f:
+			root.get_texture().get_image().save_png("%s/r4_exec_%d.png" % [out, f])
+	if frame == 260:
+		print("executions=", g.stats.get("executions", 0), " kills=", g.stats.kills)
+	# 4) upgrade screen
+	if frame == 270:
+		main._offer_upgrades()
+	if frame == 300:
+		root.get_texture().get_image().save_png("%s/r5_upgrades.png" % out)
+		var ev := InputEventKey.new(); ev.physical_keycode = KEY_2; ev.pressed = true
+		main._unhandled_input(ev)
+		print("upgrades=", p.upgrades, " paused=", paused)
+	if frame == 320:
+		quit()
+
+## Filmstrip of the full light combo from a low 3/4 camera.
+func _film(g) -> void:
+	var p = g.player
+	var inp = p.input
+	if frame == 2:
+		main.hud.visible = false
+		g.camera.distance = 6.0
+		g.camera.pitch_deg = 35.0
+		g.camera.look_ahead = 0.0
+		inp.using_touch = true
+	inp.touch_move = Vector3.ZERO
+	p.facing = Vector3(1, 0, 0) if frame < 60 else p.facing
+	if frame in [60, 76, 92, 108]:
+		inp.aim = Vector3(1, 0, 0)
+		inp.press("attack")
+	if has_meta("run_film") and frame > 30:
+		var a := frame * 0.05
+		inp.touch_move = Vector3(cos(a), 0, sin(a))
+	if frame >= 58 and frame <= 150 and frame % 3 == 0:
+		root.get_texture().get_image().save_png("%s/film_%03d.png" % [out, frame])
+	if frame > 152:
 		quit()

@@ -224,6 +224,22 @@ func portal(pos: Vector3, radius: float, dur: float, color := Color(0.9, 0.05, 0
 	var d := _ground(pos, 3, color, dur, "portal")
 	d.node.scale = Vector3(radius, 1, radius)
 
+## True if `p` stands inside a danger zone that is about to go off.
+func telegraph_threat(p: Vector3, min_progress := 0.65) -> bool:
+	for g in _grounds:
+		if g.kind != "tele" or not is_instance_valid(g.node):
+			continue
+		if g.t / g.dur < min_progress:
+			continue
+		var local: Vector3 = (g.node as Node3D).global_transform.affine_inverse() * p
+		# plane mesh spans -1..1 in local x/z
+		if g.mat.get_shader_parameter("mode") == 0:
+			if Vector2(local.x, local.z).length() <= 1.05:
+				return true
+		elif absf(local.x) <= 1.1 and absf(local.z) <= 1.05:
+			return true
+	return false
+
 func cancel(handle: Dictionary) -> void:
 	if handle.is_empty():
 		return
@@ -331,6 +347,23 @@ func _make_particles(type: String) -> GPUParticles3D:
 			pm.emission_sphere_radius = 0.4
 			pm.scale_min = 0.05; pm.scale_max = 0.13
 			ramp.set_color(0, Color(1, 0.3, 0.35)); ramp.set_color(1, Color(0.6, 0.0, 0.1, 0))
+		"step":
+			dm.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+			p.amount = 5; p.lifetime = 0.45
+			pm.direction = Vector3(0, 0.4, 0)
+			pm.spread = 180.0
+			pm.flatness = 0.7
+			pm.initial_velocity_min = 0.6; pm.initial_velocity_max = 1.4
+			pm.damping_min = 3.0; pm.damping_max = 4.0
+			pm.scale_min = 0.18; pm.scale_max = 0.32
+			ramp.set_color(0, Color(0.22, 0.18, 0.3, 0.45)); ramp.set_color(1, Color(0.1, 0.08, 0.15, 0))
+		"perfect":
+			p.amount = 40; p.lifetime = 0.6
+			pm.spread = 180.0
+			pm.initial_velocity_min = 4.0; pm.initial_velocity_max = 9.0
+			pm.damping_min = 6.0; pm.damping_max = 9.0
+			pm.scale_min = 0.08; pm.scale_max = 0.2
+			ramp.set_color(0, Color(0.8, 1.0, 1.0)); ramp.set_color(1, Color(0.3, 0.6, 1.0, 0))
 		"smoke", "smoke_ring", "dust", "death":
 			dm.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
 			p.amount = 12; p.lifetime = 0.9
@@ -406,7 +439,7 @@ func burst(type: String, pos: Vector3, dir := Vector3.UP) -> void:
 	if root == null or not particles_enabled:
 		return
 	if not _pools.has(type):
-		var count := 10 if type in ["hit", "smoke", "death", "death_embers", "soul_pop"] else 4
+		var count := 10 if type in ["hit", "smoke", "death", "death_embers", "soul_pop"] else (6 if type == "step" else 4)
 		var nodes := []
 		for i in count:
 			var p := _make_particles(type)
@@ -430,7 +463,7 @@ func burst(type: String, pos: Vector3, dir := Vector3.UP) -> void:
 ## shader variants on the title screen instead of stuttering mid-fight.
 func warmup(center: Vector3) -> void:
 	var under := center + Vector3(0, -3.0, 0)
-	for t in ["hit", "hit_player", "embers", "death_embers", "smoke", "smoke_ring", "dust", "death", "charge", "soul_pop", "souls_swirl"]:
+	for t in ["hit", "hit_player", "embers", "death_embers", "smoke", "smoke_ring", "dust", "death", "charge", "soul_pop", "souls_swirl", "step", "perfect"]:
 		burst(t, under, Vector3.UP)
 	var xf := Transform3D(Basis.IDENTITY, under)
 	slash(xf, 0.0, 90.0, 0.5, 2.0, 0.05, 0.05, 0.5, Color.RED, Color.WHITE)
