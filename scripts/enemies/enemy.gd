@@ -19,7 +19,10 @@ var elite := false
 var is_boss := false
 var hover := 0.25
 var visual_scale := 1.0
-var tint := Color(1.0, 0.06, 0.12, 1.0)
+## Threat-tier colours: tint = rim/veins, hot = eyes/maw (see README).
+var tint := Color(1.0, 0.04, 0.08, 1.1)
+var hot := Color(1.0, 0.3, 0.2)
+var twitch := 1.0
 
 var alive := true
 var state := State.SPAWN
@@ -58,7 +61,7 @@ func _ready() -> void:
 	render_key = _mesh_kind() + ("_elite" if elite else "")
 	vis_scale = Vector3.ONE * visual_scale
 	if elite or is_boss:
-		aura = FX.make_glow_sprite(Color(tint.r, tint.g * 0.5, tint.b, 0.35), 3.2 * visual_scale)
+		aura = FX.make_glow_sprite(Color(tint.r, tint.g * 0.7, tint.b, 0.3), 3.2 * visual_scale)
 		aura.position.y = 1.0 * visual_scale
 		add_child(aura)
 
@@ -105,7 +108,9 @@ func make_elite() -> void:
 	poise *= 2.5
 	knock_resist = minf(0.9, knock_resist + 0.45)
 	soul_value *= 5
-	tint = Color(1.0, 0.1, 0.55, 1.6)
+	# elites of any type burn gold: the clearest "dangerous" read in a red crowd
+	tint = Color(1.0, 0.7, 0.12, 1.6)
+	hot = Color(1.0, 1.0, 0.85)
 
 func apply_difficulty(mult: float) -> void:
 	max_hp *= mult

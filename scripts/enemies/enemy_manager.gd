@@ -4,6 +4,7 @@ class_name EnemyManager
 extends Node3D
 
 const CELL := 2.0
+const SIZE_BOOST := 1.35
 const MAX_SHADOWS := 400
 var TYPES := {
 	"wisp": Wisp,
@@ -13,7 +14,7 @@ var TYPES := {
 	"brute": Brute,
 	"boss": Boss,
 }
-var _renderers := {}   # render_key -> SpiritRenderer
+var _renderers := {}   # render_key -> [core SpiritRenderer, smoke SpiritRenderer]
 
 var all: Array[Enemy] = []
 var _pending: Array[Enemy] = []   # spawned this frame (may happen mid-iteration)
@@ -46,6 +47,10 @@ func spawn(kind: String, pos: Vector3, difficulty := 1.0, elite := false, instan
 	if elite:
 		e.make_elite()
 	e.apply_difficulty(difficulty)
+	# spirits loom over the Reaper (concept scale); bodies a bit wider to match
+	if not e.is_boss:
+		e.visual_scale *= SIZE_BOOST
+		e.radius *= 1.15
 	if instant:
 		e.spawn_time = 0.15
 	e.position = Game.resolve_circle(Vector3(pos.x, 0, pos.z), e.radius)
@@ -59,18 +64,26 @@ func spawn(kind: String, pos: Vector3, difficulty := 1.0, elite := false, instan
 ## Queue a spirit instance for drawing this frame. `src` provides the look
 ## (kind, tint) when the renderer for that key does not exist yet.
 func draw(key: String, xf: Transform3D, custom: Color, src: Enemy = null) -> void:
-	var r: SpiritRenderer = _renderers.get(key)
-	if r == null:
+	var pair: Array = _renderers.get(key, [])
+	if pair.is_empty():
 		if src == null:
 			return
-		r = SpiritRenderer.new()
 		var kind := src._mesh_kind()
-		var mat: ShaderMaterial = SpiritMesh.material_for(kind).duplicate()
-		mat.set_shader_parameter("tint", src.tint)
-		r.setup(SpiritMesh.mesh_for(kind), mat, 24 if src.is_boss else 260)
-		add_child(r)
-		_renderers[key] = r
-	r.add(xf, custom)
+		var cap := 24 if src.is_boss else 260
+		pair = []
+		for smoke in [false, true]:
+			var r := SpiritRenderer.new()
+			var base: ShaderMaterial = SpiritMesh.smoke_material_for(kind) if smoke else SpiritMesh.material_for(kind)
+			var mat: ShaderMaterial = base.duplicate()
+			mat.set_shader_parameter("tint", src.tint)
+			mat.set_shader_parameter("hot", Vector3(src.hot.r, src.hot.g, src.hot.b))
+			mat.set_shader_parameter("twitch", src.twitch)
+			r.setup(SpiritMesh.smoke_mesh_for(kind) if smoke else SpiritMesh.mesh_for(kind), mat, cap)
+			add_child(r)
+			pair.append(r)
+		_renderers[key] = pair
+	pair[0].add(xf, custom)
+	pair[1].add(xf, custom)
 
 ## Create every spirit renderer up front (and draw it once under the floor)
 ## so shaders compile before the fight starts.

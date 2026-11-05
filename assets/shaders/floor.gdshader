@@ -1,8 +1,8 @@
 // Procedural dungeon flagstones.
 shader_type spatial;
 
-uniform vec3 stone_a : source_color = vec3(0.085, 0.085, 0.10);
-uniform vec3 stone_b : source_color = vec3(0.15, 0.145, 0.17);
+uniform vec3 stone_a : source_color = vec3(0.15, 0.15, 0.18);
+uniform vec3 stone_b : source_color = vec3(0.25, 0.24, 0.28);
 uniform vec3 grout : source_color = vec3(0.02, 0.02, 0.03);
 uniform float tile = 2.2;
 uniform vec2 arena_half = vec2(20.0, 20.0);
@@ -40,7 +40,7 @@ void fragment() {
 	// wear and darkness toward walls
 	vec2 q = abs(wpos.xz) / arena_half;
 	float edge_dark = smoothstep(0.55, 1.05, max(q.x, q.y));
-	c *= 1.0 - edge_dark * 0.55;
+	c *= 1.0 - edge_dark * 0.35;
 	ALBEDO = c;
 	ROUGHNESS = 0.85 - rnd * 0.2;
 	SPECULAR = 0.35;

@@ -15,6 +15,8 @@ func _init() -> void:
 	speed = 6.0; radius = 0.35; damage = 6.0
 	poise = 0.5; soul_value = 1; hover = 0.45
 	cd = randf_range(0.8, 2.2)
+	tint = Color(1.0, 0.36, 0.03, 1.0)   # tier 1: smouldering ember
+	hot = Color(1.0, 0.85, 0.35)
 	orbit = 1.0 if randf() < 0.5 else -1.0
 
 func _think(delta: float) -> void:

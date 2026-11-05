@@ -14,7 +14,8 @@ func _init() -> void:
 	poise = 0.8; soul_value = 2; hover = 0.6
 	cd = randf_range(1.5, 3.0)
 	strafe = 1.0 if randf() < 0.5 else -1.0
-	tint = Color(1.0, 0.15, 0.25, 1.1)
+	tint = Color(1.0, 0.05, 0.42, 1.15)  # ranged: rose
+	hot = Color(1.0, 0.55, 0.85)
 
 func _think(delta: float) -> void:
 	t += delta

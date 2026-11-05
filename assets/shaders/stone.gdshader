@@ -1,6 +1,6 @@
 // Walls, pillars and props (triplanar-ish procedural stone / wood).
 shader_type spatial;
-uniform vec3 base : source_color = vec3(0.2, 0.2, 0.25);
+uniform vec3 base : source_color = vec3(0.28, 0.28, 0.33);
 uniform vec3 dark : source_color = vec3(0.04, 0.04, 0.06);
 uniform float scale = 1.6;
 uniform bool planks = false;

@@ -17,7 +17,9 @@ func _init() -> void:
 	speed = 2.4; radius = 0.95; damage = 22.0
 	poise = 3.0; knock_resist = 0.8; soul_value = 6; hover = 0.05
 	visual_scale = 1.25
-	tint = Color(1.0, 0.12, 0.08, 1.2)
+	tint = Color(0.95, 0.0, 0.02, 1.35)  # tier 4: blood, molten eyes
+	hot = Color(1.0, 0.78, 0.12)
+	twitch = 0.45
 
 func _stagger_time() -> float:
 	return 0.6

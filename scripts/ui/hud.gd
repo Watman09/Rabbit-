@@ -246,6 +246,7 @@ func _draw() -> void:
 			draw_rect(Rect2(Vector2.ZERO, vs), Color(0, 0, 0, 0.55))
 			_text(Vector2(0, vs.y * 0.4), "ПАУЗА", 56, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, vs.x, 8)
 			_draw_controls(Vector2(vs.x * 0.5, vs.y * 0.4 + 40))
+			_draw_tiers(vs.x * 0.5, vs.y * 0.4 + 40 + 8 * 24 + 24)
 		"upgrade":
 			_draw_upgrades(vs)
 		"dead":
@@ -382,9 +383,29 @@ func _draw_title(vs: Vector2) -> void:
 	draw_line(Vector2(vs.x * 0.3, y + 22), Vector2(vs.x * 0.7, y + 22), C_RED, 2.0)
 	_text(Vector2(0, y + 52), "Жнец против бесконечных волн тёмных духов", 20, C_PINK, HORIZONTAL_ALIGNMENT_CENTER, vs.x, 5)
 	_draw_controls(Vector2(vs.x * 0.5, y + 96))
+	_draw_tiers(vs.x * 0.5, y + 96 + 8 * 24 + 24)
 	var ready := Sfx.is_ready()
 	if fmod(_t, 1.2) < 0.85 or not ready:
 		_text(Vector2(0, vs.y - 70), "нажмите, чтобы начать жатву" if ready else "призыв духов…", 24, Color(1, 1, 1, 0.9), HORIZONTAL_ALIGNMENT_CENTER, vs.x, 6)
+
+## Threat-colour legend (matches the spirit tints in the enemy scripts).
+const TIERS := [
+	["слабый", Color(1.0, 0.36, 0.03)], ["обычный", Color(1.0, 0.03, 0.07)], ["дальний", Color(1.0, 0.05, 0.42)],
+	["сильный", Color(0.62, 0.1, 1.0)], ["тяжёлый", Color(0.95, 0.0, 0.02)], ["элита", Color(1.0, 0.7, 0.12)],
+]
+
+func _draw_tiers(center_x: float, y: float) -> void:
+	var w := 108.0
+	var x0 := center_x - w * TIERS.size() * 0.5
+	_text(Vector2(0, y - 14), "цвет духа — уровень угрозы", 12, Color(1, 1, 1, 0.45), HORIZONTAL_ALIGNMENT_CENTER, get_viewport_rect().size.x, 3)
+	for i in TIERS.size():
+		var c: Color = TIERS[i][1]
+		var p := Vector2(x0 + i * w + 14, y + 4)
+		draw_circle(p, 6, c)
+		if TIERS[i][0] == "тяжёлый":
+			draw_circle(p, 2.5, Color(1.0, 0.78, 0.12))   # colossi: blood body, molten eyes
+		draw_arc(p, 9, 0, TAU, 16, Color(c.r, c.g, c.b, 0.5), 1.5)
+		_text(p + Vector2(14, 5), TIERS[i][0], 13, Color(1, 1, 1, 0.8), HORIZONTAL_ALIGNMENT_LEFT, -1, 3)
 
 func _draw_controls(top: Vector2) -> void:
 	var rows := [

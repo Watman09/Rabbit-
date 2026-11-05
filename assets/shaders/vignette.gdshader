@@ -1,6 +1,6 @@
 shader_type canvas_item;
 uniform float damage = 0.0;
-uniform float base = 0.55;
+uniform float base = 0.38;
 uniform vec3 hurt_color : source_color = vec3(0.8, 0.0, 0.08);
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;

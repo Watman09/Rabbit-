@@ -27,15 +27,15 @@ func _ready() -> void:
 	e.background_mode = Environment.BG_COLOR
 	e.background_color = Color(0.005, 0.004, 0.012)
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.17, 0.16, 0.26)
-	e.ambient_light_energy = 0.9
+	e.ambient_light_color = Color(0.32, 0.31, 0.36)
+	e.ambient_light_energy = 1.0
 	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	e.tonemap_exposure = 1.05
+	e.tonemap_exposure = 1.25
 	e.glow_enabled = true
 	e.glow_intensity = 0.9
 	e.glow_strength = 1.0
 	e.glow_bloom = 0.05
-	e.glow_hdr_threshold = 0.9
+	e.glow_hdr_threshold = 1.0
 	e.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 	e.set_glow_level(0, 0.0)
 	e.set_glow_level(1, 1.0)
@@ -49,8 +49,8 @@ func _ready() -> void:
 	add_child(env)
 
 	var moon := DirectionalLight3D.new()
-	moon.light_color = Color(0.45, 0.55, 1.0)
-	moon.light_energy = 0.75
+	moon.light_color = Color(0.62, 0.66, 0.9)
+	moon.light_energy = 1.0
 	moon.rotation_degrees = Vector3(-58, 35, 0)
 	moon.shadow_enabled = false
 	world.add_child(moon)

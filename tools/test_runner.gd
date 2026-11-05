@@ -56,7 +56,8 @@ func _process(delta: float) -> bool:
 	if g.running and p:
 		_drive(p)
 		if has_meta("nospirits"):
-			for r in g.enemies._renderers.values(): r.visible = false
+			for pr in g.enemies._renderers.values():
+				for r in pr: r.visible = false
 	if scenario == "stress" and g.running and frame % 60 == 0 and g.enemies.alive_count() < 100:
 		main._stress(40)
 	if frame % 60 == 0 and g.enemies:
@@ -127,7 +128,7 @@ func _spirits(g) -> void:
 		g.camera.distance = 13.0
 		g.camera.pitch_deg = 56.0
 		g.camera.look_ahead = 0.0
-		g.player.position = Vector3(7, 0, 1)
+		g.player.position = Vector3(0, 0, 9)
 		g.camera.target = null
 		g.camera._focus = Vector3(0, 0, 0)
 		var kinds = ["wisp", "wraith", "banshee", "shade", "brute"]

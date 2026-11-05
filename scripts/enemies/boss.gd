@@ -24,7 +24,9 @@ func _init() -> void:
 	visual_scale = 1.9
 	spawn_time = 1.6
 	dying_time = 1.6
-	tint = Color(1.0, 0.05, 0.25, 1.5)
+	tint = Color(0.85, 0.0, 0.45, 1.5)   # boss: void magenta, white fire
+	hot = Color(1.0, 0.95, 1.0)
+	twitch = 0.3
 
 func _ready() -> void:
 	super()

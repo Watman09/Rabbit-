@@ -16,6 +16,8 @@ func _init() -> void:
 	speed = 3.6; radius = 0.55; damage = 11.0
 	poise = 1.0; soul_value = 2; hover = 0.2
 	weave = randf() * 10.0
+	tint = Color(1.0, 0.03, 0.07, 1.15)  # tier 2: crimson
+	hot = Color(1.0, 0.3, 0.18)
 
 func _think(delta: float) -> void:
 	t += delta

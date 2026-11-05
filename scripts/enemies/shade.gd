@@ -10,7 +10,8 @@ func _init() -> void:
 	poise = 1.5; soul_value = 3
 	reach = 2.5
 	windup_time = 0.7
-	tint = Color(0.85, 0.08, 0.35, 1.0)
+	tint = Color(0.62, 0.1, 1.0, 1.25)   # tier 3: violet
+	hot = Color(0.9, 0.65, 1.0)
 
 func _on_death() -> void:
 	if Game.enemies == null:
