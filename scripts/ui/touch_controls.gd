@@ -34,7 +34,10 @@ func _input(event: InputEvent) -> void:
 	if not visible or player == null:
 		return
 	if hud and hud.mode != "play":
-		return   # menus (upgrade cards, pause) get the touches
+		# menus (upgrade cards, pause) get the touches; a finger lifted while a
+		# menu is open never reaches us, so drop everything that was held
+		release_all()
+		return
 	if event is InputEventScreenTouch:
 		var st: InputEventScreenTouch = event
 		if st.pressed:
@@ -43,7 +46,9 @@ func _input(event: InputEvent) -> void:
 				_btn_touch[st.index] = b
 				_press(b)
 				get_viewport().set_input_as_handled()
-			elif st.position.x < get_viewport_rect().size.x * 0.5 and _stick_id == -1:
+			elif st.position.x < get_viewport_rect().size.x * 0.5:
+				# a new touch on the left always takes the stick (even if an old
+				# touch-up was lost, e.g. to a menu or the browser)
 				_stick_id = st.index
 				_stick_origin = st.position
 				_stick_pos = st.position
@@ -67,6 +72,14 @@ func _input(event: InputEvent) -> void:
 			player.input.touch_move = Vector3(v.x, 0, v.y)
 			get_viewport().set_input_as_handled()
 
+## Forget every held touch: stick centred, buttons up.
+func release_all() -> void:
+	_stick_id = -1
+	_btn_touch.clear()
+	if player:
+		player.input.touch_move = Vector3.ZERO
+		player.input.touch_heavy = false
+
 func _press(id: String) -> void:
 	for b in _buttons:
 		if b.id == id:
@@ -81,6 +94,8 @@ func _button_at(p: Vector2) -> String:
 	return ""
 
 func _process(_d: float) -> void:
+	if hud and hud.mode != "play" and (_stick_id != -1 or not _btn_touch.is_empty()):
+		release_all()
 	queue_redraw()
 
 func _draw() -> void:

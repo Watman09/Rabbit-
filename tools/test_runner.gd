@@ -32,6 +32,9 @@ func _process(delta: float) -> bool:
 	if frame == 30:
 		# wait for sfx synthesis then start
 		pass
+	if scenario == "touchbug":
+		_touchbug(g)
+		return false
 	if scenario == "menus":
 		_menus(g)
 		return false
@@ -261,3 +264,50 @@ func _menus(g) -> void:
 		root.get_texture().get_image().save_png("%s/m_%s_%s.png" % [out, lang, shots[frame]])
 	if frame > 350:
 		quit()
+
+## Regression: a finger lifted while the upgrade screen is open must not leave
+## the touch joystick stuck (phones could not move after picking a gift).
+func _touch(idx: int, pos: Vector2, pressed: bool) -> void:
+	var e := InputEventScreenTouch.new()
+	e.index = idx; e.position = pos; e.pressed = pressed
+	_feed(e)
+
+func _drag(idx: int, pos: Vector2) -> void:
+	var e := InputEventScreenDrag.new()
+	e.index = idx; e.position = pos; e.relative = Vector2(10, 0)
+	_feed(e)
+
+## Same order as the engine's _input pass: touch controls (deeper) first, then Main.
+func _feed(e: InputEvent) -> void:
+	main.touch._input(e)
+	main._input(e)
+
+func _touchbug(g) -> void:
+	var p = g.player
+	match frame:
+		5:
+			main._enable_touch()
+		40:
+			main._on_button("play")
+			main.director.set_process(false)
+		60:
+			_touch(0, Vector2(200, 450), true)
+		62:
+			_drag(0, Vector2(260, 450))
+		64:
+			print("f64 mode=", main.hud.mode, " stick=", main.touch._stick_id, " vis=", main.touch.visible, " running=", g.running)
+		70:
+			print("before gift: move=", p.input.touch_move)
+			main._offer_upgrades()
+		80:
+			_touch(0, Vector2(260, 450), false)   # finger lifted while the gift screen is open
+		120:
+			main._choose_upgrade(0)
+		130:
+			_touch(1, Vector2(220, 460), true)
+		132:
+			_drag(1, Vector2(150, 460))
+		140:
+			print("after gift: move=", p.input.touch_move, " mode=", main.hud.mode, " vel=", p.velocity)
+		141:
+			quit()
