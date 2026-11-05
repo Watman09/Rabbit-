@@ -90,7 +90,7 @@ func _drive(p) -> void:
 		p.soul_meter = 100.0
 		inp.press("ability_3")
 
-var pose_shots := {40: "idle", 77: "reap_mid", 81: "reap_end", 102: "ret_mid", 130: "rise", 166: "whirl", 230: "charge", 264: "heavy", 300: "run", 340: "maelstrom", 401: "dash"}
+var pose_shots := {40: "idle", 78: "reap_mid", 81: "reap_end", 106: "ret_mid", 132: "rise", 168: "whirl", 230: "charge", 264: "heavy", 300: "run", 340: "maelstrom", 401: "dash"}
 func _pose(g) -> void:
 	var p = g.player
 	var cam = g.camera

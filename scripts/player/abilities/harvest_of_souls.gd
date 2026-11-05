@@ -32,13 +32,13 @@ func _update(delta: float) -> bool:
 	p.velocity = Vector3.ZERO
 	if t < RISE:
 		var k := t / RISE
-		var pose := PlayerRig.ScythePose.make({"tilt": 90.0, "height": 1.1, "yaw": -170.0, "reach": 0.8, "sscale": 2.1,
+		var pose := PlayerRig.ScythePose.make({"tilt": 90.0, "height": 1.1, "yaw": -170.0, "reach": 0.8, "sscale": 1.6, "choke": 0.62,
 			"pitch": 95.0, "lean": -0.25, "bob": sin(k * PI * 0.5) * 1.6, "squash": 1.08})
 		p.rig.blend_to(pose, delta, 14.0)
 		p.rig.scythe_glow = k * 1.5
 	elif t < SLAM:
 		var k := (t - RISE) / (SLAM - RISE)
-		var pose := PlayerRig.ScythePose.make({"tilt": 90.0, "height": 1.0, "yaw": lerpf(-170.0, 60.0, k * k), "reach": 0.8, "sscale": 2.1,
+		var pose := PlayerRig.ScythePose.make({"tilt": 90.0, "height": 1.0, "yaw": lerpf(-170.0, 60.0, k * k), "reach": 0.8, "sscale": 1.6, "choke": 0.62,
 			"pitch": 95.0, "lean": 0.35, "bob": (1.0 - k * k) * 1.6, "squash": 0.95})
 		p.rig.set_pose(pose)
 	elif not _slammed:

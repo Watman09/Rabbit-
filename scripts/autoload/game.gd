@@ -47,7 +47,7 @@ func _process(delta: float) -> void:
 		stats.time += delta
 
 ## Freeze-frame on impact. Real-time duration so it is independent of time scale.
-func hitstop(duration: float, scale := 0.04) -> void:
+func hitstop(duration: float, scale := 0.18) -> void:
 	var end := Time.get_ticks_msec() + int(duration * 1000.0)
 	if end > _hitstop_end:
 		_hitstop_end = end

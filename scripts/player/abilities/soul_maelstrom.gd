@@ -31,7 +31,7 @@ func _update(delta: float) -> bool:
 	var speed := 1350.0 if t < DURATION - 0.2 else 700.0
 	_spin -= speed * delta
 	var pose := PlayerRig.ScythePose.make({"tilt": 6.0 * sin(t * 9.0), "height": 0.95, "yaw": _spin + 90.0,
-		"reach": 0.8, "sscale": 1.9, "pitch": 92.0, "body_yaw": _spin, "lean": 0.15, "squash": 1.03})
+		"reach": 0.8, "sscale": 1.6, "choke": 0.62, "pitch": 92.0, "body_yaw": _spin, "lean": 0.15, "squash": 1.03})
 	p.rig.set_pose(pose)
 	p.rig.scythe_glow = 1.0
 	_tick_t -= delta

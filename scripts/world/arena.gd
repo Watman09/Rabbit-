@@ -7,6 +7,7 @@ const FLOOR_SHADER := preload("res://assets/shaders/floor.gdshader")
 const STONE_SHADER := preload("res://assets/shaders/stone.gdshader")
 
 var _stone: ShaderMaterial
+var _pillar_mat: ShaderMaterial
 var _wood: ShaderMaterial
 var _flames: Array = []
 
@@ -14,6 +15,8 @@ func _ready() -> void:
 	var half := Game.arena_half
 	_stone = ShaderMaterial.new()
 	_stone.shader = STONE_SHADER
+	_pillar_mat = _stone.duplicate()
+	_pillar_mat.set_shader_parameter("see_through", true)
 	_wood = ShaderMaterial.new()
 	_wood.shader = STONE_SHADER
 	_wood.set_shader_parameter("planks", true)
@@ -113,6 +116,8 @@ func _ready() -> void:
 	add_child(amb)
 
 func _process(_delta: float) -> void:
+	if Game.player:
+		_pillar_mat.set_shader_parameter("player_pos", Game.player.global_position)
 	var t := Time.get_ticks_msec() * 0.001
 	for i in _flames.size():
 		var l: OmniLight3D = _flames[i]
@@ -139,12 +144,12 @@ func _pillar(pos: Vector3) -> void:
 	c.height = 2.4
 	c.radial_segments = 10
 	m.mesh = c
-	m.material_override = _stone
+	m.material_override = _pillar_mat
 	m.position = pos + Vector3(0, 1.2, 0)
 	add_child(m)
 	var base := _box(pos, Vector3(2.1, 0.45, 2.1), _stone)
 	base.rotation.y = PI * 0.25
-	var cap := _box(pos + Vector3(0, 2.3, 0), Vector3(1.9, 0.35, 1.9), _stone)
+	var cap := _box(pos + Vector3(0, 2.3, 0), Vector3(1.9, 0.35, 1.9), _pillar_mat)
 	cap.rotation.y = PI * 0.25
 	Game.obstacles.append(Vector3(pos.x, pos.z, 1.05))
 	# faint red rune ring at the base

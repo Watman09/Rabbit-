@@ -4,6 +4,8 @@ uniform vec3 base : source_color = vec3(0.2, 0.2, 0.25);
 uniform vec3 dark : source_color = vec3(0.04, 0.04, 0.06);
 uniform float scale = 1.6;
 uniform bool planks = false;
+uniform bool see_through = false;   // pillars: dither out when the player is behind them
+uniform vec3 player_pos = vec3(0.0, -100.0, 0.0);
 varying vec3 wpos;
 varying vec3 wnrm;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -16,6 +18,18 @@ void vertex() {
 	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 void fragment() {
+	if (see_through) {
+		vec2 d = wpos.xz - player_pos.xz;
+		float near = 1.0 - smoothstep(1.6, 2.8, length(d));
+		float in_front = smoothstep(-0.6, 0.4, wpos.z - player_pos.z);
+		float hide = near * in_front * smoothstep(0.3, 0.9, wpos.y) * 0.75;
+		// ordered 4x4 dither keeps it opaque-pass cheap
+		ivec2 q = ivec2(FRAGCOORD.xy) % 4;
+		float bayer = float((q.x * 4 + q.y) * 7 % 16) / 16.0;
+		if (bayer < hide) {
+			discard;
+		}
+	}
 	vec3 an = abs(wnrm);
 	vec2 uv = an.y > 0.5 ? wpos.xz : (an.x > an.z ? wpos.zy : wpos.xy);
 	uv *= scale;

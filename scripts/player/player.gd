@@ -63,6 +63,15 @@ var hit_count := 0
 var combo_hits := 0
 var combo_hits_timer := 0.0
 var _hitstop_frame := 0.0
+var _hitstop_used := false
+var _pose_start: PlayerRig.ScythePose
+var _lunge_done := 0.0
+var _hit_anim_t := 0.0
+var _slash_fx: Dictionary = {}
+## Swing shaping: the blade is pulled back past the start angle (anticipation)
+## and carries on past the end angle (follow-through) so it never stops dead.
+const ANTICIPATION := 24.0
+const FOLLOW_THROUGH := 16.0
 var _shadow: MeshInstance3D
 var _step_t := 0.0
 
@@ -109,12 +118,29 @@ func _process(delta: float) -> void:
 		State.DASH: _state_dash(delta)
 		State.CHARGE: _state_charge(delta)
 		State.CAST: _state_cast(delta)
+	_update_clips(delta)
 
 	position = Game.resolve_circle(position, radius)
 	position.y = 0.0
 	rotation.y = atan2(facing.x, facing.z)
 	var local_v := global_transform.basis.inverse() * velocity
 	rig.set_drag(local_v)
+
+func _update_clips(delta: float) -> void:
+	_hit_anim_t = maxf(0.0, _hit_anim_t - delta)
+	match state:
+		State.DASH:
+			rig.play("Dash", 0.05)
+		State.ATTACK:
+			if _hit_anim_t > 0.0:
+				rig.play("Hit", 0.05)
+			else:
+				rig.locomotion(0.0, true)
+		_:
+			if _hit_anim_t > 0.0:
+				rig.play("Hit", 0.05)
+			else:
+				rig.locomotion(Vector2(velocity.x, velocity.z).length(), false)
 
 # ------------------------------------------------------------------ MOVE
 func _state_move(delta: float) -> void:
@@ -127,18 +153,14 @@ func _state_move(delta: float) -> void:
 	_step_t += delta * (6.0 + speed01 * 6.0)
 	var target: PlayerRig.ScythePose
 	if speed01 > 0.25:
+		# legs, bob and sway come from the Run clip; this only carries the scythe
 		target = PlayerRig.POSE_RUN.copy()
-		target.bob = absf(sin(_step_t)) * 0.07 * speed01
-		target.lean = 0.12 + speed01 * 0.12
-		target.body_yaw = sin(_step_t * 0.5) * 4.0
+		target.lean = 0.05 + speed01 * 0.08
 	elif _combat_idle > 0.0:
 		target = PlayerRig.POSE_READY.copy()
-		target.bob = sin(_step_t * 0.4) * 0.015
 	else:
 		target = PlayerRig.POSE_IDLE.copy()
-		target.bob = sin(_step_t * 0.35) * 0.012
-		target.squash = 1.0 + sin(_step_t * 0.35) * 0.01
-	rig.blend_to(target, delta, 12.0)
+	rig.blend_to(target, delta, 9.0)
 	rig.scythe_glow = move_toward(rig.scythe_glow, 0.0, delta * 3.0)
 	_try_actions(true)
 
@@ -181,44 +203,65 @@ func _start_attack(a: AttackData, damage_mult := 1.0) -> void:
 	_slash_spawned = false
 	_impact_done = false
 	_prev_sweep = a.sweep_from
+	_hitstop_used = false
+	_lunge_done = 0.0
 	attack_facing = input.aim if input.aim.length() > 0.1 else facing
 	facing = attack_facing
 	velocity = Vector3.ZERO
 	_combat_idle = 2.5
+	# start from wherever the scythe is now, unwrapped toward the wind-up angle
+	_pose_start = rig.pose.copy()
+	_pose_start.yaw += roundf((_antic(a) - _pose_start.yaw) / 360.0) * 360.0
+
+func _antic(a: AttackData) -> float:
+	return a.sweep_from - a.sweep_dir() * ANTICIPATION
+
+func _follow(a: AttackData) -> float:
+	return a.sweep_to + a.sweep_dir() * FOLLOW_THROUGH
+
+static func smootherstep(k: float) -> float:
+	k = clampf(k, 0.0, 1.0)
+	return k * k * k * (k * (k * 6.0 - 15.0) + 10.0)
 
 func _state_attack(delta: float) -> void:
 	var a := attack
 	attack_t += delta
 	var t := attack_t
 	var steer := input.move * move_speed * a.move_factor
+	# lunge: one smooth displacement curve over wind-up + swing
+	var lunge_k := smootherstep(t / maxf(a.windup + a.active, 0.001))
+	position += attack_facing * (a.lunge * lunge_k - _lunge_done) + steer * delta
+	_lunge_done = a.lunge * lunge_k
 	if t < a.windup:
-		# anticipation: pull the scythe back past the start angle
-		var k := t / maxf(a.windup, 0.001)
-		var back := a.sweep_from - a.sweep_dir() * 18.0
-		var p := PlayerRig.attack_pose(a, lerpf(a.sweep_from, back, k), -0.05)
-		p.squash = 1.0 - 0.05 * k
-		rig.blend_to(p, delta, 30.0)
-		position += attack_facing * (a.lunge * 0.15 / maxf(a.windup, 0.001)) * delta + steer * delta
-		rig.scythe_glow = move_toward(rig.scythe_glow, 1.0, delta * 8.0)
+		# wind-up: ease from the current pose into the anticipation pose
+		var w := smoothstep(0.0, 1.0, t / maxf(a.windup, 0.001))
+		var p := PlayerRig.attack_pose(a, _antic(a), -0.06)
+		p.squash = 0.96
+		rig.set_pose(_pose_start.blend(p, w))
+		rig.scythe_glow = w
 	elif t < a.windup + a.active:
+		# swing: accelerates out of the wind-up, peaks mid-arc, eases into follow-through
 		var k := (t - a.windup) / a.active
-		var s := 1.0 - pow(1.0 - k, 2.2)  # ease out: fast start, settle
-		var sweep := lerpf(a.sweep_from, a.sweep_to, s)
-		var p := PlayerRig.attack_pose(a, sweep, 0.22)
-		p.squash = 1.04
+		var sweep := lerpf(_antic(a), _follow(a), smootherstep(k))
+		var p := PlayerRig.attack_pose(a, sweep, lerpf(-0.06, 0.24, smoothstep(0.0, 0.5, k)))
+		p.squash = lerpf(0.96, 1.03, smoothstep(0.0, 0.4, k))
 		rig.set_pose(p)
 		rig.scythe_glow = 1.0
-		position += attack_facing * (a.lunge * 0.85 / a.active) * (1.0 - k) * 2.0 * delta + steer * delta
 		if not _slash_spawned:
 			_slash_spawned = true
 			_spawn_slash(a)
 			if a.sound != "":
 				Sfx.play(a.sound, randf_range(0.92, 1.08))
+		rig.apply_now()
+		FX.slash_track(_slash_fx, rig.blade_point())
 		if a.hit_mode == AttackData.HitMode.SWEEP:
 			_sweep_hits(a, _prev_sweep, sweep)
 		_prev_sweep = sweep
 		if Game.projectiles:
-			Game.projectiles.cut_sweep(position, attack_facing, a.sweep_from, sweep, a.radius)
+			Game.projectiles.cut_sweep(position, attack_facing, a.sweep_from, clampf(sweep, minf(a.sweep_from, a.sweep_to), maxf(a.sweep_from, a.sweep_to)), a.radius)
+		# dash-cancel from the second half of the swing
+		if k > 0.5 and input.peek("dash"):
+			_try_actions(false)
 	else:
 		if not _impact_done:
 			_impact_done = true
@@ -228,13 +271,14 @@ func _state_attack(delta: float) -> void:
 				_impact(a)
 		var rec_t := t - a.windup - a.active
 		var k := rec_t / maxf(a.recovery, 0.001)
-		var end_pose := PlayerRig.attack_pose(a, a.sweep_to, 0.1)
+		var end_pose := PlayerRig.attack_pose(a, _follow(a), 0.24)
+		end_pose.squash = 1.03
 		var ready := PlayerRig.POSE_READY.copy()
+		ready.yaw += roundf((_follow(a) - ready.yaw) / 360.0) * 360.0
 		if a.body_spin:
-			ready.body_yaw = roundf(a.sweep_to / 360.0) * 360.0
-			ready.yaw += roundf((a.sweep_to - ready.yaw) / 360.0) * 360.0
-		rig.set_pose(end_pose.blend(ready, ease(k, 0.6)))
-		rig.scythe_glow = move_toward(rig.scythe_glow, 0.0, delta * 4.0)
+			ready.body_yaw = roundf(end_pose.body_yaw / 360.0) * 360.0
+		rig.set_pose(end_pose.blend(ready, smoothstep(0.0, 1.0, k)))
+		rig.scythe_glow = 1.0 - smoothstep(0.0, 1.0, k)
 		position += steer * 2.0 * delta
 		if input.peek("attack") or input.peek("heavy"):
 			attack_queued = true
@@ -249,10 +293,6 @@ func _state_attack(delta: float) -> void:
 			return
 		if rec_t >= a.recovery:
 			_finish_attack()
-	if t < a.windup + a.active and (input.peek("dash")) and t > a.windup:
-		# allow dash-cancel mid-swing after the first frames for responsiveness
-		if attack_t > a.windup + a.active * 0.5:
-			_try_actions(false)
 
 func _finish_attack() -> void:
 	state = State.MOVE
@@ -270,8 +310,9 @@ func _spawn_slash(a: AttackData) -> void:
 	var xf := Transform3D(Basis(Vector3.UP, atan2(attack_facing.x, attack_facing.z)), position)
 	xf = xf * Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(a.plane_tilt)), Vector3(0, a.height, 0))
 	var follow := self if a.body_spin else null
-	FX.slash(xf, a.sweep_from, a.sweep_to, a.slash_inner, a.slash_outer, a.active, a.slash_life,
-		a.slash_trail, a.slash_edge, a.slash_core, a.slash_intensity, follow)
+	# same arc and the same easing curve as the blade, so the trail stays on it
+	_slash_fx = FX.slash(xf, _antic(a), _follow(a), a.slash_inner, a.slash_outer, a.active, a.slash_life,
+		a.slash_trail, a.slash_edge, a.slash_core, a.slash_intensity, follow, true)
 
 func _rel_angle(dir_to: Vector3) -> float:
 	var fa := atan2(attack_facing.x, attack_facing.z)
@@ -341,9 +382,13 @@ func deal_damage(e: Node, info: DamageInfo, stop := 0.04, shake := 0.2) -> void:
 	if combo_hits > Game.stats.max_combo:
 		Game.stats.max_combo = combo_hits
 	Game.stats.damage += info.amount
-	if stop > _hitstop_frame:
+	# one short slow-down per swing (not a freeze every frame) keeps hits weighty but fluid
+	var swing_lock := state == State.ATTACK and _hitstop_used
+	if stop > _hitstop_frame and not swing_lock:
 		_hitstop_frame = stop
-		Game.hitstop(stop * (1.4 if killed else 1.0))
+		Game.hitstop(stop * (1.3 if killed else 1.0), 0.18)
+		if state == State.ATTACK:
+			_hitstop_used = true
 	if Game.camera:
 		Game.camera.add_trauma(shake * (1.3 if killed else 0.7))
 
@@ -406,7 +451,7 @@ func _state_charge(delta: float) -> void:
 	position += velocity * delta
 	facing = _turn_toward(facing, input.aim, 14.0 * delta)
 	var p := PlayerRig.ScythePose.make({"tilt": 90.0, "height": 1.05, "yaw": -150.0 - minf(charge_t, 0.65) * 20.0,
-		"reach": 0.7, "pitch": 95.0, "lean": -0.12, "squash": 0.95, "sscale": 1.85})
+		"reach": 0.7, "pitch": 95.0, "lean": -0.12, "squash": 0.95, "sscale": 1.6, "choke": 0.62})
 	rig.blend_to(p, delta, 12.0)
 	rig.scythe_glow = minf(1.0, charge_t / 0.65) * (1.0 + (0.3 * sin(charge_t * 40.0) if full else 0.0))
 	_charge_fx_t -= delta
@@ -469,6 +514,7 @@ func take_damage(amount: float, from: Vector3) -> bool:
 		velocity = d.normalized() * 6.0
 		if state == State.MOVE:
 			position += d.normalized() * 0.3
+	_hit_anim_t = 0.3
 	Events.player_damaged.emit(amount, hp, max_hp)
 	Sfx.play("hurt", randf_range(0.9, 1.05))
 	FX.burst("hit_player", position + Vector3.UP, d.normalized())
@@ -506,8 +552,7 @@ func _die() -> void:
 	FX.shockwave(position, 4.0, Color(1, 0.05, 0.2), 0.8)
 	Sfx.play("player_death", 1.0)
 	Game.slowmo(1.2, 0.25)
-	var tw := create_tween()
-	tw.tween_property(rig, "scale", Vector3(1.2, 0.05, 1.2), 0.9).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+	rig.play("Death", 0.08)
 	Events.player_died.emit()
 
 # ------------------------------------------------------------------ helpers

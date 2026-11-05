@@ -152,10 +152,10 @@ func make_slash_material(edge: Color, core: Color, intensity: float, trail: floa
 ## A crescent trail that sweeps from `from_deg` to `to_deg` in the XZ plane of `xf`.
 func slash(xf: Transform3D, from_deg: float, to_deg: float, inner: float, outer: float,
 		active: float, life: float, trail: float, edge: Color, core: Color, intensity := 2.4,
-		follow: Node3D = null) -> void:
+		follow: Node3D = null, eased := false) -> Dictionary:
 	var root := _root()
 	if root == null:
-		return
+		return {}
 	var m := MeshInstance3D.new()
 	m.mesh = _arc_mesh(from_deg, to_deg, inner, outer)
 	var mat := make_slash_material(edge, core, intensity, trail)
@@ -167,8 +167,25 @@ func slash(xf: Transform3D, from_deg: float, to_deg: float, inner: float, outer:
 	var off := Vector3.ZERO
 	if follow:
 		off = xf.origin - follow.global_position
-	_slashes.append({"node": m, "mat": mat, "t": 0.0, "active": maxf(active, 0.01), "life": life,
-		"trail": trail, "follow": follow, "off": off})
+	var d := {"node": m, "mat": mat, "t": 0.0, "active": maxf(active, 0.01), "life": life,
+		"trail": trail, "follow": follow, "off": off, "eased": eased, "from": from_deg, "to": to_deg, "manual": -1.0}
+	_slashes.append(d)
+	return d
+
+## Drive a slash's leading edge from the real blade-tip position (world space).
+func slash_track(handle: Dictionary, tip: Vector3) -> void:
+	if handle.is_empty() or not is_instance_valid(handle.node):
+		return
+	var local: Vector3 = (handle.node as Node3D).global_transform.affine_inverse() * tip
+	var ang := rad_to_deg(atan2(local.x, local.z))
+	var span: float = handle.to - handle.from
+	# unwrap toward the expected progress so ±180 crossings do not jump
+	var expect: float = handle.from + span * maxf(handle.manual, 0.0)
+	ang += roundf((expect - ang) / 360.0) * 360.0
+	var k := clampf((ang - handle.from) / span, 0.0, 1.0)
+	handle.manual = maxf(handle.manual, k)
+	# apply now: FX._process already ran this frame (autoloads update first)
+	handle.mat.set_shader_parameter("progress", handle.manual)
 
 # ------------------------------------------------------------------ ground effects
 func _ground(pos: Vector3, mode: int, color: Color, dur: float, kind: String) -> Dictionary:
@@ -224,10 +241,7 @@ func dash_streak(from: Vector3, to: Vector3) -> void:
 
 # ------------------------------------------------------------------ afterimages / fragments
 func afterimage(rig: PlayerRig, xf: Transform3D) -> void:
-	var g := rig.make_afterimage()
-	_root().add_child(g)
-	g.global_transform = xf
-	_ghosts.append({"node": g, "t": 0.0, "life": 0.28})
+	rig.spawn_afterimage(xf)
 
 ## "Dispersal stages": small spirit shards fly off and dissolve. They are
 ## drawn through the enemy type's MultiMesh.
@@ -440,6 +454,14 @@ func _process(delta: float) -> void:
 		var fade := 1.0
 		if t < s.active:
 			prog = t / s.active
+			if s.eased:
+				prog = Player.smootherstep(prog)
+			if s.manual >= 0.0:
+				prog = s.manual
+		elif s.manual >= 0.0:
+			var k2: float = (t - s.active) / s.life
+			prog = s.manual + k2 * s.trail
+			fade = 1.0 - k2 * k2
 		else:
 			var k: float = (t - s.active) / s.life
 			prog = 1.0 + k * s.trail

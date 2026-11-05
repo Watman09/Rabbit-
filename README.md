@@ -91,8 +91,12 @@ tools/        build_hero_meshes.gd (разделение FBX на тело и к
   регистрация в `EnemyManager.TYPES` и `WaveDirector.COST/UNLOCK`.
 * Весь урон идёт через `DamageInfo` и `Player.deal_damage()` / `Enemy.take_hit()` —
   сюда же лягут статусы, вампиризм, крит и т.п.
-* Скелетная модель позже заменит только `PlayerRig` (сейчас тело и коса позируются кодом,
-  т.к. исходный FBX — статичный меш без скелета).
+* Анимация героя: скелет (21 кость) и клипы Idle/Run/Dash/Hit/Death сделаны в Blender
+  скриптом `tools/blender/rig_rabbit.py` → `assets/models/hero_rigged.glb`. Коса — отдельный
+  меш, её дуга задаётся `AttackData`; `ReaperIK` (SkeletonModifier3D) поворачивает корпус
+  в замах и держит обе руки на древке (IK на двух костях). Новый клип = новый action в скрипте.
+* Удар косы — непрерывная кривая: замах назад → ускорение → проводка за точку удара → возврат
+  (`ANTICIPATION`/`FOLLOW_THROUGH` в `player.gd`), след привязан к реальному кончику лезвия.
 
 **Производительность (браузер)**
 
@@ -104,6 +108,9 @@ tools/        build_hero_meshes.gd (разделение FBX на тело и к
 * Звук синтезируется при старте (ассетов нет), по 2 звука за кадр — без фриза.
 
 ## Ассеты
+
+* Риг героя (нужен Blender 4.2 или модуль `bpy==4.2.0` для Python 3.11):
+  `python tools/blender/rig_rabbit.py` (или `blender -b -P tools/blender/rig_rabbit.py`).
 
 * `assets/models/rabbit_reaper.fbx` — исходная модель. `hero_body.res` / `hero_scythe.res`
   генерируются `tools/build_hero_meshes.gd` (разделение по связным компонентам + палитра

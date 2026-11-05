@@ -29,8 +29,8 @@ enum HitMode { SWEEP, CONE_AT_END }
 @export var sweep_from := 110.0           # degrees, facing-relative (0 = forward, + = right side of screen when facing up)
 @export var sweep_to := -80.0
 @export var plane_tilt := 0.0             # tilt of the swing plane around the facing axis
-@export var height := 0.95
-@export var reach := 0.85
+@export var height := 1.02
+@export var reach := 0.62
 @export var pitch := 92.0
 @export var spin := 0.0
 @export var body_twist := 0.35
