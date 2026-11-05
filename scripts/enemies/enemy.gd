@@ -86,7 +86,7 @@ func _stun() -> void:
 	_marker.visible = true
 	FX.shockwave(position, 2.0 * visual_scale, Color(0.65, 0.3, 1.0), 0.4)
 	Sfx.play("charged", 0.7, -6.0)
-	Events.popup.emit("ОГЛУШЁН", position + Vector3.UP * (2.2 * visual_scale), Color(0.75, 0.55, 1.0), 1.0)
+	Events.popup.emit(Loc.t("p_stunned"), position + Vector3.UP * (2.2 * visual_scale), Color(0.75, 0.55, 1.0), 1.0)
 
 ## Called when the player starts an execution on this spirit.
 func hold_for_execution() -> void:

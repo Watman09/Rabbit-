@@ -16,7 +16,7 @@ var _ghost_t := 0.0
 
 func _init(p: Player) -> void:
 	super(p)
-	display_name = "Казнь"
+	display_name = "ab_execution"
 	icon = "heavy"
 	cooldown = 0.0
 	invulnerable = true
@@ -93,5 +93,5 @@ func _strike() -> void:
 		if e.alive and e.position.distance_to(target.position) - e.radius < 3.0:
 			p.deal_damage(e, DamageInfo.make(30.0, target.position, 12.0, 3.0, "execution_wave"), 0.0, 0.0)
 	p.heal(25.0 if p.mods.executioner else 12.0)
-	Events.popup.emit("КАЗНЬ", target.position + Vector3.UP * 2.6, Color(0.8, 0.5, 1.0), 1.4)
+	Events.popup.emit(Loc.t("p_execute"), target.position + Vector3.UP * 2.6, Color(0.8, 0.5, 1.0), 1.4)
 	Game.stats.executions = Game.stats.get("executions", 0) + 1

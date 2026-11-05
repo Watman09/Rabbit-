@@ -14,7 +14,7 @@ var _slammed := false
 
 func _init(p: Player) -> void:
 	super(p)
-	display_name = "Жатва душ"
+	display_name = "ab_harvest"
 	icon = "harvest"
 	cooldown = 1.0
 	soul_cost = 100.0

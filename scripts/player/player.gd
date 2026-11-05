@@ -433,7 +433,7 @@ func deal_damage(e: Node, info: DamageInfo, stop := 0.04, shake := 0.2) -> void:
 	if crit_t > 0.0 and info.source != "execution":
 		info.amount *= 2.0
 		info.stagger += 2.0
-		Events.popup.emit("КРИТ", e.position + Vector3.UP * 2.0, Color(0.6, 0.95, 1.0), 0.8)
+		Events.popup.emit(Loc.t("p_crit"), e.position + Vector3.UP * 2.0, Color(0.6, 0.95, 1.0), 0.8)
 	var killed: bool = e.take_hit(info)
 	if mods.lifesteal > 0.0 and _lifesteal_frame < 3.0:
 		_lifesteal_frame += mods.lifesteal
@@ -608,7 +608,7 @@ func _perfect_dodge(from: Vector3) -> void:
 	FX.burst("perfect", position + Vector3.UP, Vector3.UP)
 	FX.screen_flash(Color(0.5, 0.85, 1.0, 0.18))
 	Sfx.play("perfect", 1.0)
-	Events.popup.emit("ИДЕАЛЬНО!", position + Vector3.UP * 2.4, Color(0.6, 0.95, 1.0), 1.2)
+	Events.popup.emit(Loc.t("p_perfect"), position + Vector3.UP * 2.4, Color(0.6, 0.95, 1.0), 1.2)
 	Game.stats.perfect = Game.stats.get("perfect", 0) + 1
 
 ## Something is about to hit the Reaper right now (bolt, swing, AoE).

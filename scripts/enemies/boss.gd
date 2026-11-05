@@ -1,9 +1,10 @@
-## Final boss: "Скорбящая Пустота" (The Mourning Hollow).
+## Final boss: The Mourning Hollow ("Скорбящая Пустота").
 ## Three phases; each unlocks more attacks and makes it faster.
 class_name Boss
 extends Enemy
 
-const NAME := "Скорбящая Пустота"
+static func display_name() -> String:
+	return Loc.t("boss_name")
 
 var mode := "idle"
 var t := 0.0
@@ -52,7 +53,7 @@ func _start_phase_change() -> void:
 	_on_interrupt()
 	mode = "phase_change"; t = 0.0
 	Sfx.play("boss_roar", 1.0 + phase_n * 0.08)
-	Events.announcement.emit("ФАЗА %d" % phase_n, "Пустота яростнее")
+	Events.announcement.emit(Loc.t("phase", phase_n), Loc.t("phase_sub"))
 	FX.shockwave(position, 9.0, Color(1, 0.05, 0.3), 0.7)
 	if Game.camera:
 		Game.camera.add_trauma(0.6)

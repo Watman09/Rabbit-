@@ -14,6 +14,7 @@ var arena_half := Vector2(19.0, 19.0)
 var obstacles: Array[Vector3] = []
 
 var running := false
+var retry_requested := false   # survives the scene reload: start a run right away
 var ai_frozen := false   # debug/test: spirits idle in place
 var stats := {}
 
@@ -98,7 +99,7 @@ const BINDINGS := {
 	"ability_1": [KEY_Q, KEY_1, "joy_lb"],
 	"ability_2": [KEY_E, KEY_2, "joy_rb"],
 	"ability_3": [KEY_R, KEY_3, "joy_b"],
-	"pause": [KEY_ESCAPE, KEY_P, "joy_start"],
+	"pause": [KEY_P, "joy_start"],   # no Esc: browsers reserve it for leaving fullscreen
 	"debug_stats": [KEY_F3],
 	"debug_stress": [KEY_F9],
 }

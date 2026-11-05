@@ -15,7 +15,7 @@ var RADIUS := BASE_RADIUS
 
 func _init(p: Player) -> void:
 	super(p)
-	display_name = "Вихрь душ"
+	display_name = "ab_maelstrom"
 	icon = "whirl"
 	cooldown = 7.0
 	animates_body = true

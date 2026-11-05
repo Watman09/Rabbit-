@@ -1,6 +1,9 @@
-## Procedural sound effects. Every sound is synthesised at startup (spread
-## over several frames) so the prototype ships with zero audio assets.
-## Replace entries in `_streams` with real .wav/.ogg files later.
+## Sound effects and music.
+## Real audio files win: for every sound name below, res://assets/audio/<name>.ogg
+## (or .mp3 / .wav) is used if it exists; music is res://assets/audio/music.ogg.
+## Anything missing falls back to a synthesised placeholder (spread over a few
+## frames at startup). Playgama does not accept code-synthesised audio, so
+## ship real files for release (see PLAYGAMA.md).
 extends Node
 
 const SR := 22050
@@ -16,7 +19,7 @@ var muted := false
 
 const SOUNDS := ["swing", "hit", "kill", "soul", "dash", "swing_big", "heavy", "hurt", "claw", "telegraph",
 	"bolt", "slam", "portal", "charge", "charged", "denied", "roar_small", "boss_roar", "ability_whirl",
-	"ability_crescent", "ability_harvest", "wave", "player_death", "step", "perfect", "parry", "execute", "upgrade", "drone"]
+	"ability_crescent", "ability_harvest", "wave", "player_death", "step", "perfect", "parry", "execute", "upgrade", "click", "drone"]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -45,9 +48,22 @@ func start_music() -> void:
 	if _streams.has("drone") and not _music.playing:
 		_music.stream = _streams["drone"]
 		_music.play()
+	apply_settings()
+
+## Volumes and mute from the settings + platform state (Plat).
+func apply_settings() -> void:
+	var blocked := Plat.audio_blocked() if Plat else false
+	AudioServer.set_bus_mute(0, blocked)
+	_music.stream_paused = blocked
+	var mv: float = float(Plat.save.music) if Plat else 0.7
+	_music.volume_db = linear_to_db(maxf(mv, 0.0001)) - 8.0
+
+func _sfx_db() -> float:
+	var v: float = float(Plat.save.sfx) if Plat else 0.9
+	return linear_to_db(maxf(v, 0.0001))
 
 func play(name: String, pitch := 1.0, volume_db := 0.0) -> void:
-	if muted or not _streams.has(name):
+	if muted or not _streams.has(name) or (Plat and Plat.audio_blocked()):
 		return
 	var now := Time.get_ticks_msec()
 	var min_gap := 35 if name in ["hit", "kill", "soul", "claw"] else 15
@@ -63,11 +79,22 @@ func play(name: String, pitch := 1.0, volume_db := 0.0) -> void:
 		return
 	best.stream = _streams[name]
 	best.pitch_scale = clampf(pitch, 0.3, 3.0)
-	best.volume_db = volume_db
+	best.volume_db = volume_db + _sfx_db()
 	best.play()
 
 # ------------------------------------------------------------------ synthesis
-func _make(n: String) -> AudioStreamWAV:
+func _make(n: String) -> AudioStream:
+	var file := n if n != "drone" else "music"
+	for ext in ["ogg", "mp3", "wav"]:
+		var path := "res://assets/audio/%s.%s" % [file, ext]
+		if ResourceLoader.exists(path):
+			var st: AudioStream = load(path)
+			if n == "drone" and "loop" in st:
+				st.loop = true
+			return st
+	return _synth(n)
+
+func _synth(n: String) -> AudioStreamWAV:
 	var s: PackedFloat32Array
 	var loop := false
 	match n:
@@ -98,6 +125,7 @@ func _make(n: String) -> AudioStreamWAV:
 		"perfect": s = _mix(_mix(_tone(0.7, 1568.0, 1568.0, 0.25, "sine"), _tone(0.7, 2093.0, 2093.0, 0.18, "sine")), _noise_sweep(0.5, 4000.0, 800.0, 0.35))
 		"parry": s = _mix(_tone(0.3, 2637.0, 1975.0, 0.3, "square"), _noise_burst(0.06, 0.6, 7000.0))
 		"execute": s = _distort(_mix(_boom(0.9, 55.0, 1.0), _whoosh(0.5, 3000.0, 300.0, 1.0)), 1.6)
+		"click": s = _mix(_tone(0.08, 880.0, 660.0, 0.25, "sine"), _noise_burst(0.02, 0.2, 6000.0))
 		"upgrade": s = _mix(_mix(_tone(0.6, 523.0, 523.0, 0.25, "sine"), _tone(0.6, 784.0, 784.0, 0.2, "sine")), _tone(0.6, 1046.0, 1046.0, 0.15, "sine"))
 		"drone":
 			s = _drone(8.0)

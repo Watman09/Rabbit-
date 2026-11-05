@@ -32,6 +32,9 @@ func _process(delta: float) -> bool:
 	if frame == 30:
 		# wait for sfx synthesis then start
 		pass
+	if scenario == "menus":
+		_menus(g)
+		return false
 	if scenario == "film":
 		_film(g)
 		return false
@@ -229,4 +232,32 @@ func _film(g) -> void:
 	if frame >= 58 and frame <= 150 and frame % 3 == 0:
 		root.get_texture().get_image().save_png("%s/film_%03d.png" % [out, frame])
 	if frame > 152:
+		quit()
+
+## Screenshots of every menu screen in the language given as 3rd argument.
+func _menus(g) -> void:
+	var args := OS.get_cmdline_user_args()
+	var lang: String = args[2] if args.size() > 2 else "en"
+	var shots := {60: "menu", 90: "settings", 120: "howto", 160: "play", 190: "paused", 230: "upgrade", 345: "dead"}
+	if frame == 2:
+		root.get_node("Loc").set_lang(lang)
+	match frame:
+		80: main._on_button("settings")
+		110:
+			main._on_button("back")
+			main._on_button("howto")
+		140:
+			main._on_button("back")
+			main._on_button("play")
+		180: main._on_button("pause")
+		210:
+			main._on_button("resume")
+			main._offer_upgrades()
+		250:
+			main._choose_upgrade(0)
+			g.player.hp = 1.0
+			g.player.take_damage(50.0, g.player.position + Vector3(1, 0, 0))
+	if shots.has(frame):
+		root.get_texture().get_image().save_png("%s/m_%s_%s.png" % [out, lang, shots[frame]])
+	if frame > 350:
 		quit()

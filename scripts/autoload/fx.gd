@@ -22,6 +22,7 @@ var _pools := {}             # type -> {nodes: Array, i: int}
 var _soft_tex: GradientTexture2D
 var _flash_rect: ColorRect
 var particles_enabled := true
+var quality_cap := 1.0        # 0.5 on LOW graphics
 var quality := 1.0           # scales particle amounts (lowered automatically on slow devices)
 
 func _ready() -> void:

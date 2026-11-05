@@ -8,23 +8,29 @@ extends RefCounted
 const RARE_COLOR := Color(0.75, 0.35, 1.0)
 const COMMON_COLOR := Color(1.0, 0.2, 0.35)
 
-## id -> {name, desc, max, rare, icon}
+## id -> {max, rare, icon}; texts are Loc keys "u_<id>" and "u_<id>_d"
 const LIST := {
-	"sharp": {"name": "Острая коса", "desc": "+20% урона всем ударам", "max": 5, "rare": false, "icon": "attack"},
-	"reach": {"name": "Длинная коса", "desc": "+15% дальность и ширина взмахов", "max": 3, "rare": false, "icon": "crescent"},
-	"swift": {"name": "Стремительность", "desc": "+10% скорость бега", "max": 3, "rare": false, "icon": "dash"},
-	"dash_charge": {"name": "Третий шаг тени", "desc": "+1 заряд рывка", "max": 2, "rare": true, "icon": "dash"},
-	"lifesteal": {"name": "Жажда душ", "desc": "Каждое попадание лечит 0.6 HP", "max": 3, "rare": false, "icon": "harvest"},
-	"vitality": {"name": "Крепость жнеца", "desc": "+25 к здоровью и полное лечение", "max": 3, "rare": false, "icon": "harvest"},
-	"soul_hunger": {"name": "Голод жатвы", "desc": "Шкала душ заполняется на 35% быстрее", "max": 3, "rare": false, "icon": "harvest"},
-	"cooldown": {"name": "Тёмный ритм", "desc": "-18% перезарядки способностей", "max": 3, "rare": false, "icon": "whirl"},
-	"shadow_trail": {"name": "Режущая тень", "desc": "Рывок ранит духов на пути (20 урона)", "max": 3, "rare": true, "icon": "dash"},
-	"echo": {"name": "Эхо косы", "desc": "Каждый 4-й удар выпускает летящий серп", "max": 2, "rare": true, "icon": "crescent"},
-	"crescent_fan": {"name": "Веер серпов", "desc": "Багровый серп летит тройным веером", "max": 1, "rare": true, "icon": "crescent"},
-	"storm": {"name": "Буря душ", "desc": "Вихрь дольше на 40% и шире на 20%", "max": 2, "rare": false, "icon": "whirl"},
-	"burst": {"name": "Распад", "desc": "Убитые духи взрываются с шансом 25%", "max": 3, "rare": true, "icon": "whirl"},
-	"executioner": {"name": "Палач", "desc": "Казнь лечит на 25 и даёт двойные души", "max": 1, "rare": true, "icon": "heavy"},
+	"sharp": {"max": 5, "rare": false, "icon": "attack"},
+	"reach": {"max": 3, "rare": false, "icon": "crescent"},
+	"swift": {"max": 3, "rare": false, "icon": "dash"},
+	"dash_charge": {"max": 2, "rare": true, "icon": "dash"},
+	"lifesteal": {"max": 3, "rare": false, "icon": "harvest"},
+	"vitality": {"max": 3, "rare": false, "icon": "harvest"},
+	"soul_hunger": {"max": 3, "rare": false, "icon": "harvest"},
+	"cooldown": {"max": 3, "rare": false, "icon": "whirl"},
+	"shadow_trail": {"max": 3, "rare": true, "icon": "dash"},
+	"echo": {"max": 2, "rare": true, "icon": "crescent"},
+	"crescent_fan": {"max": 1, "rare": true, "icon": "crescent"},
+	"storm": {"max": 2, "rare": false, "icon": "whirl"},
+	"burst": {"max": 3, "rare": true, "icon": "whirl"},
+	"executioner": {"max": 1, "rare": true, "icon": "heavy"},
 }
+
+static func title(id: String) -> String:
+	return Loc.t("u_" + id)
+
+static func desc(id: String) -> String:
+	return Loc.t("u_" + id + "_d")
 
 static func level(p: Player, id: String) -> int:
 	return p.upgrades.get(id, 0)

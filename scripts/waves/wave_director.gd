@@ -67,7 +67,7 @@ func _begin_wave() -> void:
 		boss_alive = true
 		_boss_escort_t = 12.0
 		Events.wave_started.emit(wave, true)
-		Events.announcement.emit("ВОЛНА %d" % wave, "БОСС: " + Boss.NAME)
+		Events.announcement.emit(Loc.t("wave", wave), Loc.t("boss_wave", Boss.display_name()))
 		var p := _spawn_point(8.0, 12.0)
 		FX.portal(p, 4.0, 1.8)
 		get_tree().create_timer(0.8, false).timeout.connect(func():
@@ -77,18 +77,18 @@ func _begin_wave() -> void:
 	budget = int(10 + local * 7 + cycle * 18)
 	elites_left = 0 if local < 3 else (local / 3 + cycle)
 	Events.wave_started.emit(wave, false)
-	var sub := "Духи пробуждаются"
+	var sub := Loc.t("w_default")
 	if local == 3:
-		sub = "Появились элитные духи"
+		sub = Loc.t("w_elite")
 	elif local == UNLOCK.banshee:
-		sub = "Плакальщицы атакуют издалека"
+		sub = Loc.t("w_banshee")
 	elif local == UNLOCK.shade:
-		sub = "Тени распадаются на части"
+		sub = Loc.t("w_shade")
 	elif local == UNLOCK.brute:
-		sub = "Идут Колоссы мрака"
+		sub = Loc.t("w_brute")
 	elif local == BOSS_EVERY - 1:
-		sub = "Пустота близко…"
-	Events.announcement.emit("ВОЛНА %d" % wave, sub)
+		sub = Loc.t("w_prelude")
+	Events.announcement.emit(Loc.t("wave", wave), sub)
 
 func _available_kinds() -> Array:
 	var local := (wave - 1) % BOSS_EVERY + 1

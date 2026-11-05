@@ -24,10 +24,17 @@ textures/vram_compression/import_etc2_astc=true
 
 [autoload]
 
+Bridge="*res://addons/playgama_bridge/bridge.gd"
 Events="*res://scripts/autoload/events.gd"
 Game="*res://scripts/autoload/game.gd"
+Loc="*res://scripts/autoload/loc.gd"
 FX="*res://scripts/autoload/fx.gd"
 Sfx="*res://scripts/autoload/sfx.gd"
+Plat="*res://scripts/autoload/plat.gd"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/playgama_bridge/plugin.cfg")
 
 [input_devices]
 

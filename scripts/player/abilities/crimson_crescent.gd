@@ -8,7 +8,7 @@ var _data: AttackData
 
 func _init(p: Player) -> void:
 	super(p)
-	display_name = "Багровый серп"
+	display_name = "ab_crescent"
 	icon = "crescent"
 	cooldown = 3.2
 	animates_body = true

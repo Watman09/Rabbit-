@@ -94,7 +94,7 @@ func _reflect(i: int, origin: Vector3) -> void:
 	var now := Time.get_ticks_msec()
 	if now - _last_parry_popup > 600:
 		_last_parry_popup = now
-		Events.popup.emit("ОТРАЖЕНО", _pos[i] + Vector3.UP * 0.8, Color(0.8, 0.6, 1.0), 0.9)
+		Events.popup.emit(Loc.t("p_parried"), _pos[i] + Vector3.UP * 0.8, Color(0.8, 0.6, 1.0), 0.9)
 	Game.stats.parries = Game.stats.get("parries", 0) + 1
 
 ## True if an enemy bolt will pass within `r` of `p` in the next `horizon` seconds.

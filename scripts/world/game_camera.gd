@@ -10,6 +10,7 @@ extends Camera3D
 
 var target: Node3D
 var trauma := 0.0
+var shake_enabled := true
 var _focus := Vector3.ZERO
 var _fov_kick := 0.0
 var _t := 0.0
@@ -23,7 +24,8 @@ func _ready() -> void:
 		_focus = target.position
 
 func add_trauma(v: float) -> void:
-	trauma = clampf(trauma + v * 0.5, 0.0, 1.0)
+	if shake_enabled:
+		trauma = clampf(trauma + v * 0.5, 0.0, 1.0)
 
 func punch_fov(v: float) -> void:
 	_fov_kick = v

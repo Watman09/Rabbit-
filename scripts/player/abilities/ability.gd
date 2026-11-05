@@ -4,7 +4,7 @@ class_name Ability
 extends RefCounted
 
 var player: Player
-var display_name := "Ability"
+var display_name := "Ability"   # localization key (Loc)
 var icon := "none"           # HUD sigil id
 var cooldown := 5.0
 var cd_left := 0.0
