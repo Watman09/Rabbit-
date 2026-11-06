@@ -12,9 +12,12 @@ uniform float sway = 1.0;           // cloak wind
 uniform vec3 drag = vec3(0.0);      // local-space movement drag for the cloak
 uniform float cloth_height = 1.0;   // cloth below this height sways
 
+uniform bool use_cloth_mask = true;   // UV.x = 1 on cloth (cape, hood, rags), 0 on body / legs
+
 void vertex() {
 	float h = clamp((cloth_height - VERTEX.y) / cloth_height, 0.0, 1.0);
-	float w = h * h;
+	// only cloth flutters; legs, torso and head follow the skeleton exactly
+	float w = h * h * (use_cloth_mask ? UV.x : 1.0);
 	float t = TIME * 2.4;
 	VERTEX.x += sin(t + VERTEX.y * 7.0 + VERTEX.z * 3.0) * 0.018 * w * sway;
 	VERTEX.z += cos(t * 0.8 + VERTEX.y * 5.0 + VERTEX.x * 4.0) * 0.014 * w * sway;

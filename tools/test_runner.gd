@@ -32,6 +32,9 @@ func _process(delta: float) -> bool:
 	if frame == 30:
 		# wait for sfx synthesis then start
 		pass
+	if scenario == "runside":
+		_runside(g)
+		return false
 	if scenario == "touchbug":
 		_touchbug(g)
 		return false
@@ -311,3 +314,25 @@ func _touchbug(g) -> void:
 			print("after gift: move=", p.input.touch_move, " mode=", main.hud.mode, " vel=", p.velocity)
 		141:
 			quit()
+
+## Side view of the run cycle (legs check). Pass "nomask" to see the old shader.
+func _runside(g) -> void:
+	var p = g.player
+	if frame == 2:
+		main.hud.visible = false
+		g.ai_frozen = true
+		main.director.set_process(false)
+		g.camera.target = null
+		g.camera.set_process(false)
+		p.position = Vector3(-10, 0, 6)
+		if "nomask" in OS.get_cmdline_user_args():
+			p.rig.body_mat.set_shader_parameter("use_cloth_mask", false)
+	if frame > 2:
+		p.input.touch_move = Vector3(1, 0, 0)
+		var cam = g.camera
+		cam.global_position = p.global_position + Vector3(0, 1.2, 5.5)
+		cam.look_at(p.global_position + Vector3(0, 0.8, 0), Vector3.UP)
+	if frame >= 70 and frame < 94 and frame % 3 == 0:
+		root.get_texture().get_image().save_png("%s/run_%03d.png" % [out, frame])
+	if frame > 95:
+		quit()

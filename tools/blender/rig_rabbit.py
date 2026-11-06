@@ -289,6 +289,16 @@ for i in range(nv):
         groups[names[k]].add([i], w / tot, "REPLACE")
 print("weights done for", len(body.data.vertices), "vertices")
 
+# Cloth mask for the game's wind/drag shader, in UV.x: 1 on the hood, cape and
+# loose cloth pieces, 0 on the body, legs and head (those follow the skeleton only).
+body.data.uv_layers.new(name="cloth")
+uv_cloth = body.data.uv_layers["cloth"]       # fetch after creating (references go stale)
+part_codes = body.data.attributes["part"]
+for poly in body.data.polygons:
+    for li in poly.loop_indices:
+        pc = part_codes.data[body.data.loops[li].vertex_index].value
+        uv_cloth.data[li].uv = (1.0 if pc in (3, 4, 5) else 0.0, 0.0)
+
 # ---------------------------------------------------------------- animation helpers
 pose = rig.pose
 rest_rot = {b.name: b.matrix_local.to_3x3().to_quaternion() for b in arm_data.bones}
@@ -380,16 +390,24 @@ for f in range(0, N + 1, 1):
     ph = f / N * math.tau
     s = math.sin(ph)
     c = math.cos(ph)
-    # left leg forward at ph = pi/2
-    thL = -42.0 * s
-    thR = 42.0 * s
-    # knee bends most while the leg swings forward (recovery), less on contact
-    shL = 15.0 + 55.0 * max(0.0, -c) + 10.0 * max(0.0, s)
-    shR = 15.0 + 55.0 * max(0.0, c) + 10.0 * max(0.0, -s)
+    # left leg forward at ph = pi/2. A leg swings forward (recovery) while its
+    # thigh angle decreases: the left leg when cos > 0, the right when cos < 0.
+    # The knee folds during that forward swing (heel tucked under the hip) and
+    # stays nearly straight while the foot is on the ground pushing back, so the
+    # rear foot never flicks up behind the body.
+    thL = -40.0 * s - 4.0 * c * c
+    thR = 40.0 * s - 4.0 * c * c
+    swingL = max(0.0, c)
+    swingR = max(0.0, -c)
+    shL = 8.0 + 42.0 * swingL ** 1.5
+    shR = 8.0 + 42.0 * swingR ** 1.5
+    # foot: toes point down while swinging, flat on contact, slight push-off at the back
+    ftL = -14.0 * swingL + 6.0 * max(0.0, -s) - 6.0
+    ftR = -14.0 * swingR + 6.0 * max(0.0, s) - 6.0
     bob = 0.035 * abs(math.cos(ph))   # high at mid-stance x2 per cycle
     run.append((f + 1, merge(
-        leg("L", thL, shL, -12.0 * s - 10.0),
-        leg("R", thR, shR, 12.0 * s - 10.0),
+        leg("L", thL, shL, ftL),
+        leg("R", thR, shR, ftR),
         {"hips": [(UP, 8.0 * s), (SIDE, 7.0)],
          "spine": [(UP, -5.0 * s), (SIDE, 5.0)],
          "chest": [(UP, -6.0 * s), (SIDE, 4.0)],

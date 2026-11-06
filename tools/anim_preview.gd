@@ -28,7 +28,7 @@ func _init():
 	cam = Camera3D.new(); cam.projection = Camera3D.PROJECTION_ORTHOGONAL; cam.size = 2.2; r.add_child(cam)
 	var clips = OS.get_cmdline_user_args() if OS.get_cmdline_user_args().size() > 0 else ap.get_animation_list()
 	for a in clips:
-		var n = 4
+		var n = 8 if a == "Run" else 4
 		for i in n:
 			for v in ["front", "side"]:
 				shots.append([a, ap.get_animation(a).length * i / (n - 1), v])
