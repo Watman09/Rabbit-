@@ -30,7 +30,7 @@ func _init():
 	for a in clips:
 		var n = 8 if a == "Run" else 4
 		for i in n:
-			for v in ["front", "side"]:
+			for v in ["front", "side", "back"]:
 				shots.append([a, ap.get_animation(a).length * i / (n - 1), v])
 func _dump(n, d):
 	if d < 4: print("  ".repeat(d), n.name, " ", n.get_class())
@@ -43,6 +43,8 @@ func _process(dt):
 		ap.play(s[0]); ap.seek(s[1], true); ap.pause()
 		if s[2] == "front":
 			cam.position = Vector3(0, 0.9, 4); cam.look_at(Vector3(0, 0.9, 0))
+		elif s[2] == "back":
+			cam.position = Vector3(0, 0.9, -4); cam.look_at(Vector3(0, 0.9, 0))
 		else:
 			cam.position = Vector3(4, 0.9, 0); cam.look_at(Vector3(0, 0.9, 0))
 	if f % 3 == 0:
